@@ -3,13 +3,64 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>精准对齐 · 无闪烁切换</title>
+<title>home page</title>
 <style>
   html, body {
     margin: 0;
     height: 100%;
     overflow: hidden;
     background:#000;
+  }
+
+  /* 加载界面样式 */
+  #loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    transition: opacity 0.5s ease;
+  }
+
+  #loading-screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .loading-title {
+    color: #fff;
+    font-size: 24px;
+    margin-bottom: 30px;
+    font-family: Arial, sans-serif;
+  }
+
+  .progress-container {
+    width: 300px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #00ff88, #00ccff);
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 2px;
+  }
+
+  .loading-text {
+    color: #fff;
+    margin-top: 20px;
+    font-size: 14px;
+    opacity: 0.8;
   }
 
   #container {
@@ -67,7 +118,17 @@
 </style>
 </head>
 <body>
-  <div id="container">
+  <!-- 加载界面 -->
+  <div id="loading-screen">
+    <div class="loading-title">正在加载中...</div>
+    <div class="progress-container">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div class="loading-text" id="loading-text">准备中...</div>
+  </div>
+
+  <!-- 主界面 -->
+  <div id="container" style="display: none;">
     <div id="bgA" class="bg-layer" style="background-image:url('home/0-0.png')"></div>
     <div id="bgB" class="bg-layer" style="background-image:url('home/0-0.png')"></div>
     <div id="grid"></div>
@@ -77,43 +138,125 @@
 const grid = document.getElementById('grid');
 const bgA  = document.getElementById('bgA');
 const bgB  = document.getElementById('bgB');
+const loadingScreen = document.getElementById('loading-screen');
+const progressBar = document.getElementById('progress-bar');
+const loadingText = document.getElementById('loading-text');
+const container = document.getElementById('container');
 
 let showing = bgA;         // 当前可见层
 let hidden  = bgB;         // 当前隐藏层
 let requestSeq = 0;        // 悬停请求序号（防竞态）
-const cache = new Map();   // 简单缓存：url -> Promise<void>
+const cache = new Map();   // 图片缓存：url -> Image对象
+const imageCache = new Map(); // 持久化图片缓存：url -> Image对象
+
+// 加载状态
+let totalImages = 0;
+let loadedImages = 0;
+let isPreloading = true;
 
 /** 预加载图片，确保切换前一定已就绪 */
 function preload(url) {
-  if (cache.has(url)) return cache.get(url);
+  // 如果图片已经在持久化缓存中，直接返回
+  if (imageCache.has(url)) {
+    return Promise.resolve(imageCache.get(url));
+  }
+  
+  // 如果正在加载中，返回现有的Promise
+  if (cache.has(url)) {
+    return cache.get(url);
+  }
+  
   const p = new Promise((resolve, reject) => {
     const img = new Image();
     img.src = url;
+    
+    img.onload = () => {
+      // 将图片对象保存到持久化缓存
+      imageCache.set(url, img);
+      cache.delete(url); // 从临时缓存中删除
+      
+      if (isPreloading) {
+        loadedImages++;
+        updateProgress();
+      }
+      resolve(img);
+    };
+    
+    img.onerror = () => {
+      cache.delete(url);
+      if (isPreloading) {
+        loadedImages++;
+        updateProgress();
+      }
+      reject(new Error(`Failed to load ${url}`));
+    };
+    
     // 尝试更可靠的 decode（更少闪烁）
     if ('decode' in img) {
-      img.decode().then(resolve).catch(() => {
-        img.onload = () => resolve();
-        img.onerror = reject;
+      img.decode().catch(() => {
+        // decode失败时依赖onload事件
       });
-    } else {
-      img.onload = () => resolve();
-      img.onerror = reject;
     }
   });
+  
   cache.set(url, p);
   return p;
+}
+
+/** 更新加载进度 */
+function updateProgress() {
+  const progress = Math.round((loadedImages / totalImages) * 100);
+  progressBar.style.width = progress + '%';
+  loadingText.textContent = `已加载 ${loadedImages}/${totalImages} 张图片 (${progress}%)`;
+  
+  if (loadedImages >= totalImages) {
+    setTimeout(() => {
+      showMainInterface();
+    }, 500); // 延迟500ms显示主界面
+  }
+}
+
+/** 显示主界面 */
+function showMainInterface() {
+  loadingScreen.classList.add('hidden');
+  container.style.display = 'block';
+  isPreloading = false;
+  
+  // 确保初始背景已设置
+  bgA.style.backgroundImage = 'url(home/0-0.png)';
+  bgB.style.backgroundImage = 'url(home/0-0.png)';
+  
+  // 输出缓存状态信息
+  console.log(`图片缓存完成: ${imageCache.size} 张图片已缓存`);
+}
+
+/** 验证缓存状态 */
+function validateCache() {
+  console.log(`当前缓存状态: ${imageCache.size} 张图片`);
+  console.log(`临时缓存状态: ${cache.size} 个加载中`);
 }
 
 /** 切换背景：仅在新图完全加载后才淡入，并且只响应最后一次请求 */
 async function switchTo(url) {
   const mySeq = ++requestSeq;
   try {
-    await preload(url);
+    // 确保图片已加载并缓存
+    const img = await preload(url);
+    
     // 期间如果又来了更新请求，就放弃这次切换
     if (mySeq !== requestSeq) return;
 
+    // 验证图片对象是否有效
+    if (!img || !img.complete) {
+      console.warn('Image not ready:', url);
+      return;
+    }
+
     // 先把新图放到隐藏层，但仍保持隐藏层 opacity=0
     hidden.style.backgroundImage = `url(${url})`;
+    
+    // 强制重绘，确保图片已渲染
+    hidden.offsetHeight;
 
     // 再开始交叉淡入（旧图始终可见直到此刻）
     hidden.style.opacity = '1';
@@ -158,8 +301,54 @@ grid.addEventListener('mouseleave', () => {
   switchTo('home/0-0.png');
 });
 
-// 可选：首屏预加载常用几张，进一步减少首次延迟
-['home/0-0.png'].forEach(preload);
+/** 生成所有需要预加载的图片URL */
+function generateAllImageUrls() {
+  const urls = ['home/0-0.png']; // 默认图片
+  
+  // 生成所有网格区域的图片URL
+  for (let r = 2; r <= 11; r++) {
+    for (let c = 2; c <= 22; c++) {
+      urls.push(`home/${r}-${c}.png`);
+    }
+  }
+  
+  return urls;
+}
+
+/** 开始预加载所有图片 */
+async function preloadAllImages() {
+  const allUrls = generateAllImageUrls();
+  totalImages = allUrls.length;
+  loadedImages = 0;
+  
+  loadingText.textContent = `准备加载 ${totalImages} 张图片...`;
+  
+  // 批量预加载所有图片
+  const preloadPromises = allUrls.map(url => 
+    preload(url).catch(error => {
+      console.warn(`Failed to load ${url}:`, error);
+    })
+  );
+  
+  // 等待所有图片加载完成
+  await Promise.allSettled(preloadPromises);
+}
+
+// 页面加载完成后开始预加载
+document.addEventListener('DOMContentLoaded', () => {
+  preloadAllImages();
+  
+  // 定期验证缓存状态（调试用）
+  setInterval(() => {
+    if (!isPreloading) {
+      validateCache();
+    }
+  }, 10000); // 每10秒检查一次
+});
+
+// 添加全局缓存验证函数（调试用）
+window.validateImageCache = validateCache;
+window.getCacheSize = () => imageCache.size;
 </script>
 </body>
 </html>
