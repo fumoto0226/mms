@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>精准对齐 · 无闪烁切换</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background:#000;
+  }
+
+  #container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* —— 两层背景：与网格同一缩放逻辑 —— */
+  .bg-layer {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    aspect-ratio: calc(23 / 12);
+    height: 100vh;
+    transform: translate(-50%, -50%);
+    background-size: 100% 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+    transition: opacity 220ms ease;
+    will-change: opacity;
+    pointer-events: none;
+  }
+  @media (min-aspect-ratio: 23/12) {
+    .bg-layer { width: 100vw; height: auto; }
+  }
+  #bgA { z-index: 0; opacity: 1; }
+  #bgB { z-index: 1; opacity: 0; }
+
+  /* —— 网格：同样比例 + 外圈禁用 —— */
+  #grid {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    aspect-ratio: calc(23 / 12);
+    height: 100vh;
+    transform: translate(-50%, -50%);
+    display: grid;
+    grid-template-columns: repeat(23, 1fr);
+    grid-template-rows: repeat(12, 1fr);
+    z-index: 2;
+  }
+  @media (min-aspect-ratio: 23/12) {
+    #grid { width: 100vw; height: auto; }
+  }
+  #grid div {
+    border: 1px solid rgba(255,255,255,0.05);
+    /* 去掉 hover 高亮 */
+  }
+  #grid div.disabled {
+    background-color: rgba(255,255,255,0.02);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+  <div id="container">
+    <div id="bgA" class="bg-layer" style="background-image:url('home/0-0.png')"></div>
+    <div id="bgB" class="bg-layer" style="background-image:url('home/0-0.png')"></div>
+    <div id="grid"></div>
+  </div>
+
+<script>
+const grid = document.getElementById('grid');
+const bgA  = document.getElementById('bgA');
+const bgB  = document.getElementById('bgB');
+
+let showing = bgA;         // 当前可见层
+let hidden  = bgB;         // 当前隐藏层
+let requestSeq = 0;        // 悬停请求序号（防竞态）
+const cache = new Map();   // 简单缓存：url -> Promise<void>
+
+/** 预加载图片，确保切换前一定已就绪 */
+function preload(url) {
+  if (cache.has(url)) return cache.get(url);
+  const p = new Promise((resolve, reject) => {
+    const img = new Image();
+    img.src = url;
+    // 尝试更可靠的 decode（更少闪烁）
+    if ('decode' in img) {
+      img.decode().then(resolve).catch(() => {
+        img.onload = () => resolve();
+        img.onerror = reject;
+      });
+    } else {
+      img.onload = () => resolve();
+      img.onerror = reject;
+    }
+  });
+  cache.set(url, p);
+  return p;
+}
+
+/** 切换背景：仅在新图完全加载后才淡入，并且只响应最后一次请求 */
+async function switchTo(url) {
+  const mySeq = ++requestSeq;
+  try {
+    await preload(url);
+    // 期间如果又来了更新请求，就放弃这次切换
+    if (mySeq !== requestSeq) return;
+
+    // 先把新图放到隐藏层，但仍保持隐藏层 opacity=0
+    hidden.style.backgroundImage = `url(${url})`;
+
+    // 再开始交叉淡入（旧图始终可见直到此刻）
+    hidden.style.opacity = '1';
+    showing.style.opacity = '0';
+
+    // 监听一次过渡结束后交换角色
+    const done = new Promise(res => {
+      const handler = () => {
+        hidden.removeEventListener('transitionend', handler);
+        res();
+      };
+      hidden.addEventListener('transitionend', handler);
+    });
+    await done;
+
+    // 交换层引用，确保下一次切换仍然平滑
+    const tmp = showing; showing = hidden; hidden = tmp;
+  } catch (e) {
+    // 加载失败时保持当前画面不变（不闪黑）
+    console.warn('Image load failed:', url, e);
+  }
+}
+
+/** 生成网格并绑定事件（外圈禁用） */
+for (let r = 1; r <= 12; r++) {
+  for (let c = 1; c <= 23; c++) {
+    const cell = document.createElement('div');
+    const isEdge = (r === 1 || r === 12 || c === 1 || c === 23);
+    if (isEdge) {
+      cell.classList.add('disabled');
+    } else {
+      cell.addEventListener('mouseenter', () => {
+        switchTo(`home/${r}-${c}.png`);
+      });
+    }
+    grid.appendChild(cell);
+  }
+}
+
+// 离开网格恢复默认图（同样等加载好再切）
+grid.addEventListener('mouseleave', () => {
+  switchTo('home/0-0.png');
+});
+
+// 可选：首屏预加载常用几张，进一步减少首次延迟
+['home/0-0.png'].forEach(preload);
+</script>
+</body>
+</html>
