@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>P图功能页示例</title>
+<script src="https://unpkg.com/konva@9.3.3/konva.min.js"></script>
+<style>
+  body { margin: 0; background: #222; color: #fff; text-align: center; }
+  #stage-container { margin-top: 20px; display: inline-block; background: #333; }
+  .toolbar img {
+    width: 80px;
+    margin: 10px;
+    cursor: pointer;
+    border: 2px solid transparent;
+  }
+  .toolbar img:hover {
+    border-color: #00ccff;
+  }
+</style>
+</head>
+<body>
+  <h2>上传照片，添加贴图 🎨</h2>
+  <input type="file" id="upload" accept="image/*"><br>
+  <div id="stage-container"></div>
+  <div class="toolbar">
+    <img src="stickers/hat.png" alt="帽子" onclick="addSticker('stickers/hat.png')">
+    <img src="stickers/glasses.png" alt="眼镜" onclick="addSticker('stickers/glasses.png')">
+    <img src="stickers/flower.png" alt="花" onclick="addSticker('stickers/flower.png')">
+  </div>
+  <button onclick="exportImage()">导出图片</button>
+
+<script>
+let stage, layer, backgroundImage;
+
+function initStage() {
+  stage = new Konva.Stage({
+    container: 'stage-container',
+    width: 500,
+    height: 500,
+  });
+  layer = new Konva.Layer();
+  stage.add(layer);
+}
+
+function loadBackground(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const ratio = Math.min(500 / img.width, 500 / img.height);
+      const w = img.width * ratio;
+      const h = img.height * ratio;
+
+      if (backgroundImage) backgroundImage.destroy();
+
+      backgroundImage = new Konva.Image({
+        image: img,
+        width: w,
+        height: h,
+        x: (500 - w) / 2,
+        y: (500 - h) / 2,
+      });
+      layer.add(backgroundImage);
+      layer.draw();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+document.getElementById('upload').addEventListener('change', e => {
+  if (e.target.files.length > 0) {
+    loadBackground(e.target.files[0]);
+  }
+});
+
+function addSticker(src) {
+  const img = new Image();
+  img.onload = () => {
+    const sticker = new Konva.Image({
+      image: img,
+      x: 250 - img.width / 4,
+      y: 250 - img.height / 4,
+      width: img.width / 2,
+      height: img.height / 2,
+      draggable: true,
+    });
+    // 支持缩放旋转
+    const tr = new Konva.Transformer({ nodes: [sticker], enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'], rotateEnabled: true });
+    layer.add(sticker);
+    layer.add(tr);
+    layer.draw();
+  };
+  img.src = src;
+}
+
+function exportImage() {
+  const dataURL = stage.toDataURL({ mimeType: 'image/png' });
+  const link = document.createElement('a');
+  link.download = 'p图作品.png';
+  link.href = dataURL;
+  link.click();
+}
+
+initStage();
+</script>
+</body>
+</html>

@@ -115,6 +115,90 @@
     background-color: rgba(255,255,255,0.02);
     pointer-events: none;
   }
+
+  /* AI识别框样式 */
+  .ai-detection-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .ai-region {
+    position: absolute;
+    pointer-events: none;
+  }
+
+  .ai-box {
+    position: absolute;
+    border: 2px solid var(--region-color);
+    background: transparent;
+    box-sizing: border-box;
+    transform-origin: center;
+    opacity: 0;
+    animation: expandBox 0.8s ease-out forwards;
+  }
+
+  .ai-label {
+    position: absolute;
+    left: -2px;
+    top: -1.5em;
+    padding: 2px 6px;
+    background: var(--region-color);
+    color: rgb(0, 0, 0);
+    font-weight: bold;
+    font-size: 12px;
+    font-family: Arial, sans-serif;
+    border-radius: 2px;
+    opacity: 0;
+    animation: showLabel 1s ease-out 0.8s forwards;
+    white-space: nowrap;
+    transform: translateY(-5px);
+  }
+
+  .ai-label-text {
+    display: inline-block;
+    min-width: 1ch;
+  }
+
+  @keyframes expandBox {
+    from { 
+      transform: scale(0); 
+      opacity: 0; 
+    }
+    to { 
+      transform: scale(1); 
+      opacity: 1; 
+    }
+  }
+
+  @keyframes showLabel {
+    from { 
+      opacity: 0; 
+      transform: translateY(-5px);
+    }
+    to { 
+      opacity: 1; 
+      transform: translateY(0);
+    }
+  }
+
+  /* 识别框脉冲效果 - 简单的透明度变化 */
+  .ai-box {
+    animation: expandBox 0.8s ease-out forwards, pulse 2s ease-in-out infinite 0.8s;
+  }
+
+  @keyframes pulse {
+    0%, 100% { 
+      opacity: 1;
+    }
+    50% { 
+      opacity: 0.7;
+    }
+  }
 </style>
 </head>
 <body>
@@ -132,6 +216,8 @@
     <div id="bgA" class="bg-layer" style="background-image:url('home/0-0.png')"></div>
     <div id="bgB" class="bg-layer" style="background-image:url('home/0-0.png')"></div>
     <div id="grid"></div>
+    <!-- AI识别框容器 -->
+    <div id="ai-detection-container" class="ai-detection-container"></div>
   </div>
 
 <script>
@@ -142,6 +228,7 @@ const loadingScreen = document.getElementById('loading-screen');
 const progressBar = document.getElementById('progress-bar');
 const loadingText = document.getElementById('loading-text');
 const container = document.getElementById('container');
+const aiDetectionContainer = document.getElementById('ai-detection-container');
 
 let showing = bgA;         // 当前可见层
 let hidden  = bgB;         // 当前隐藏层
@@ -280,25 +367,18 @@ async function switchTo(url) {
   }
 }
 
-/** 生成网格并绑定事件（外圈禁用） */
-for (let r = 1; r <= 12; r++) {
-  for (let c = 1; c <= 23; c++) {
-    const cell = document.createElement('div');
-    const isEdge = (r === 1 || r === 12 || c === 1 || c === 23);
-    if (isEdge) {
-      cell.classList.add('disabled');
-    } else {
-      cell.addEventListener('mouseenter', () => {
-        switchTo(`home/${r}-${c}.png`);
-      });
-    }
-    grid.appendChild(cell);
-  }
-}
 
 // 离开网格恢复默认图（同样等加载好再切）
 grid.addEventListener('mouseleave', () => {
   switchTo('home/0-0.png');
+  // 立即清理所有定时器和识别框
+  if (hideTimeout) {
+    clearTimeout(hideTimeout);
+    hideTimeout = null;
+  }
+  hideAllAIRegions();
+  currentAIRegion = null;
+  console.log('离开网格，隐藏所有识别框');
 });
 
 /** 生成所有需要预加载的图片URL */
@@ -349,6 +429,277 @@ document.addEventListener('DOMContentLoaded', () => {
 // 添加全局缓存验证函数（调试用）
 window.validateImageCache = validateCache;
 window.getCacheSize = () => imageCache.size;
+
+// ========== AI识别框功能 ==========
+
+// 识别区域数据 - 简化的区域定义
+const regions = {
+    // 10-10区域的识别框
+    "10-10": [
+    {
+      x: 500, y: 300, width: 200, height: 150,
+      color: "#FF6B6B", name: "New Object"
+    },
+    {
+      x: 800, y: 400, width: 150, height: 100,
+      color: "#4ECDC4", name: "Another Object"
+    }
+  ],
+   // 11-15区域的识别框
+   "11-15": [
+    {
+      x: 300, y: 100, width: 200, height: 150,
+      color: "#00FF88", name: "Garden"
+    },
+    {
+      x: 600, y: 300, width: 180, height: 200,
+      color: "#FF6B6B", name: "Fountain"
+    }
+  ],
+  // 11-16区域的识别框
+  "11-16": [
+    {
+      x: 960, y: 20, width: 180, height: 440,
+      color: "#96FD00", name: "Yoyogi Building"
+    },
+    {
+      x: 200, y: 200, width: 160, height: 120,
+      color: "#F807FD", name: "Tree"
+    },
+    {
+      x: 400, y: 500, width: 260, height: 140,
+      color: "#F807FD", name: "Tree"
+    }
+  ],
+ 
+};
+
+// 全局状态跟踪
+let currentAIRegion = null;
+let hideTimeout = null;
+
+// 简化的区域处理函数
+function setupAIRegion(gridRow, gridCol) {
+  const regionKey = `${gridRow}-${gridCol}`;
+  
+  // 检查是否有该区域的识别框数据
+  if (regions[regionKey]) {
+    return {
+      isAIRegion: true,
+      regionKey: regionKey
+    };
+  }
+  
+  return { isAIRegion: false };
+}
+
+// 安全的显示识别框函数
+function safeShowAIRegions(regionKey) {
+  // 清除隐藏定时器
+  if (hideTimeout) {
+    clearTimeout(hideTimeout);
+    hideTimeout = null;
+  }
+  
+  // 如果已经是当前区域，不重复显示
+  if (currentAIRegion === regionKey) {
+    return;
+  }
+  
+  // 显示新区域的识别框
+  showAIRegions(regionKey);
+  currentAIRegion = regionKey;
+  console.log(`切换到区域 ${regionKey} 的识别框`);
+}
+
+// 安全的隐藏识别框函数
+function safeHideAIRegions() {
+  // 清除隐藏定时器
+  if (hideTimeout) {
+    clearTimeout(hideTimeout);
+  }
+  
+  // 延迟隐藏，给其他区域切换留时间
+  hideTimeout = setTimeout(() => {
+    hideAllAIRegions();
+    currentAIRegion = null;
+    console.log('隐藏所有识别框');
+  }, 150);
+}
+
+// 乱码字符集
+const garbledChars = "@#¥%*&!?$^~`|\\/<>{}[]()+=_-";
+
+/**
+ * 生成随机乱码文字
+ * @param {string} targetText 目标文字
+ * @param {number} length 乱码长度
+ * @returns {string} 乱码文字
+ */
+function generateGarbledText(targetText, length) {
+  let garbled = '';
+  for (let i = 0; i < length; i++) {
+    garbled += garbledChars[Math.floor(Math.random() * garbledChars.length)];
+  }
+  return garbled;
+}
+
+/**
+ * 文字从乱码变为正确文字的动画
+ * @param {HTMLElement} textElement 文字元素
+ * @param {string} targetText 目标文字
+ * @param {number} duration 动画持续时间（毫秒）
+ */
+function animateTextReveal(textElement, targetText, duration = 1000) {
+  const textLength = targetText.length;
+  const interval = duration / (textLength * 3); // 每个字符刷新3次
+  
+  let currentIndex = 0;
+  let animationFrame = 0;
+  
+  const animate = () => {
+    if (currentIndex < textLength) {
+      // 生成当前进度的乱码文字
+      const garbledLength = Math.max(1, textLength - currentIndex);
+      const garbledText = generateGarbledText(targetText, garbledLength);
+      const revealedText = targetText.substring(0, currentIndex);
+      
+      textElement.textContent = revealedText + garbledText;
+      
+      // 每3帧更新一次字符
+      if (animationFrame % 3 === 0) {
+        currentIndex++;
+      }
+      animationFrame++;
+      
+      requestAnimationFrame(animate);
+    } else {
+      // 动画结束，显示最终文字
+      textElement.textContent = targetText;
+    }
+  };
+  
+  animate();
+}
+
+
+/**
+ * 创建AI识别框
+ * @param {Object} region 区域数据
+ * @param {number} delay 延迟时间（毫秒）
+ */
+function createAIRegion(region, delay = 0) {
+  setTimeout(() => {
+    // 创建区域容器
+    const regionElement = document.createElement('div');
+    regionElement.className = 'ai-region';
+    regionElement.style.left = region.x + 'px';
+    regionElement.style.top = region.y + 'px';
+    regionElement.style.setProperty('--region-color', region.color);
+    
+    // 创建识别框
+    const boxElement = document.createElement('div');
+    boxElement.className = 'ai-box';
+    boxElement.style.width = region.width + 'px';
+    boxElement.style.height = region.height + 'px';
+    
+    // 创建标签
+    const labelElement = document.createElement('div');
+    labelElement.className = 'ai-label';
+    
+    const labelTextElement = document.createElement('span');
+    labelTextElement.className = 'ai-label-text';
+    labelElement.appendChild(labelTextElement);
+    
+    // 组装元素
+    regionElement.appendChild(boxElement);
+    regionElement.appendChild(labelElement);
+    aiDetectionContainer.appendChild(regionElement);
+    
+    // 启动文字动画（延迟1.2秒，等框动画完成）
+    setTimeout(() => {
+      animateTextReveal(labelTextElement, region.name, 800);
+    }, 1200);
+    
+  }, delay);
+}
+
+/**
+ * 显示指定区域的AI识别框
+ * @param {string} regionKey 区域键名（如"11-16"或"11-15"）
+ * @param {number} staggerDelay 每个框之间的延迟（毫秒）
+ */
+function showAIRegions(regionKey, staggerDelay = 300) {
+  // 清空现有识别框
+  aiDetectionContainer.innerHTML = '';
+  
+  // 获取指定区域的识别框数据
+  const regionData = regions[regionKey];
+  if (!regionData) {
+    console.warn(`Region ${regionKey} not found`);
+    return;
+  }
+  
+  // 依次创建识别框
+  regionData.forEach((region, index) => {
+    createAIRegion(region, index * staggerDelay);
+  });
+}
+
+/**
+ * 显示所有AI识别框（兼容旧版本）
+ * @param {number} staggerDelay 每个框之间的延迟（毫秒）
+ */
+function showAllAIRegions(staggerDelay = 300) {
+  // 默认显示11-16区域的识别框
+  showAIRegions("11-16", staggerDelay);
+}
+
+/**
+ * 隐藏所有AI识别框
+ */
+function hideAllAIRegions() {
+  aiDetectionContainer.innerHTML = '';
+}
+
+
+// 添加全局函数供外部调用
+window.showAIRegions = showAIRegions;
+window.showAllAIRegions = showAllAIRegions;
+window.hideAIRegions = hideAllAIRegions;
+window.createAIRegion = createAIRegion;
+
+/** 生成网格并绑定事件（外圈禁用） */
+for (let r = 1; r <= 12; r++) {
+  for (let c = 1; c <= 23; c++) {
+    const cell = document.createElement('div');
+    const isEdge = (r === 1 || r === 12 || c === 1 || c === 23);
+    
+    if (isEdge) {
+      cell.classList.add('disabled');
+    } else {
+      // 检查是否是AI识别区域
+      const aiRegion = setupAIRegion(r, c);
+      
+      if (aiRegion.isAIRegion) {
+        // AI识别区域：悬停时显示该区域的识别框
+        cell.addEventListener('mouseenter', () => {
+          switchTo(`home/${r}-${c}.png`);
+          safeShowAIRegions(aiRegion.regionKey);
+        });
+        cell.addEventListener('mouseleave', () => {
+          safeHideAIRegions();
+        });
+      } else {
+        // 普通区域：只切换背景
+        cell.addEventListener('mouseenter', () => {
+          switchTo(`home/${r}-${c}.png`);
+        });
+      }
+    }
+    grid.appendChild(cell);
+  }
+}
 </script>
 </body>
 </html>
