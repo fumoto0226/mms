@@ -132,6 +132,61 @@
     pointer-events: none;
   }
 
+  /* —— UI 覆盖层（贴在背景上的UI） —— */
+  #uiOverlay {
+    position: absolute;
+    left: 0; top: 0;
+    pointer-events: none; /* 默认不拦截事件 */
+    z-index: 20; /* 高于网格与AI识别框 */
+  }
+  
+  #uiOverlay .menu {
+    pointer-events: auto; /* 菜单可以接收鼠标事件 */
+  }
+  #uiOverlay img#logo {
+    position: absolute;
+    width: 260px; /* 实际尺寸由JS按比例缩放 */
+  }
+  #uiOverlay .menu div {
+    position: absolute;
+    width: 160px;
+    padding: 8px 8px 8px 8px;
+    background: #000;
+    color: #fff;
+    font-weight: bold;
+    text-align: center;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+    border-radius: 4px; 
+    user-select: none;
+  }
+  
+  #uiOverlay .menu div:hover {
+    background: #333;
+    border-color: #fff;
+    transform: scale(1.05);
+  }
+  
+  #uiOverlay .menu div:active {
+    background: #555;
+    transform: scale(0.95);
+  }
+  
+  #uiOverlay .menu div.clicked {
+    background: #666;
+    border-color: #00ff88;
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+  }
+  #uiOverlay #version {
+    position: absolute;
+    font-size: 12px;
+    color: #fff;
+    opacity: 0.8;
+    font-weight: 500; /* 增加字重，从默认变为半粗体 */
+  }
+
   .ai-box {
     position: absolute;
     border: 2px solid var(--region-color);
@@ -218,6 +273,16 @@
     <div id="grid"></div>
     <!-- AI识别框容器 -->
     <div id="ai-detection-container" class="ai-detection-container"></div>
+    <!-- 背景贴附UI容器 -->
+    <div id="uiOverlay">
+      <img id="logo" src="img/logo01.svg" alt="logo">
+      <div class="menu">
+        <div>記録</div>
+        <div>アルバム</div>
+        <div>設定</div>
+      </div>
+      <div id="version">ver.1.0.0.20251027-beta</div>
+    </div>
   </div>
 
 <script>
@@ -229,6 +294,7 @@ const progressBar = document.getElementById('progress-bar');
 const loadingText = document.getElementById('loading-text');
 const container = document.getElementById('container');
 const aiDetectionContainer = document.getElementById('ai-detection-container');
+const uiOverlay = document.getElementById('uiOverlay');
 
 let showing = bgA;         // 当前可见层
 let hidden  = bgB;         // 当前隐藏层
@@ -367,6 +433,54 @@ async function switchTo(url) {
   }
 }
 
+// —— UI 覆盖层布局（与背景一致的 aspect-fill 逻辑） ——
+const uiBaseWidth = 1920;
+const uiBaseHeight = 960;
+function layoutUI() {
+  if (!uiOverlay) return;
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  const scale = Math.max(W / uiBaseWidth, H / uiBaseHeight);
+  const viewW = uiBaseWidth * scale;
+  const viewH = uiBaseHeight * scale;
+  const offsetX = (W - viewW) / 2;
+  const offsetY = (H - viewH) / 2;
+
+  // 容器尺寸与位置
+  uiOverlay.style.width = `${viewW}px`;
+  uiOverlay.style.height = `${viewH}px`;
+  uiOverlay.style.left = `${offsetX}px`;
+  uiOverlay.style.top = `${offsetY}px`;
+
+  // logo
+  const logo = document.getElementById('logo');
+  if (logo) {
+    logo.style.left = `${950 * scale}px`;//位置
+    logo.style.top = `${60 * scale}px`;
+    logo.style.width = `${860 * scale}px`;//大小
+  }
+
+  // 菜单（黑底白字按钮）
+  const menuItems = uiOverlay.querySelectorAll('.menu div');
+  const baseY = 350; // 起始 y 坐标（基于 1920×960）
+  const step = 76;   // 每项间隔
+  const menuX = 1560; // 🎯 菜单位置 X 坐标（从 1650 改为 1500，往左移动 150px）
+  menuItems.forEach((m, i) => {
+    m.style.left = `${menuX * scale}px`; // 🎯 修改位置：往左移动
+    m.style.top = `${(baseY + i * step) * scale}px`;
+    m.style.width = `${160 * scale}px`;
+    m.style.fontSize = `${20 * scale}px`;
+  });
+
+  // 版本号
+  const version = document.getElementById('version');
+  if (version) {
+    version.style.left = `${1560 * scale}px`;
+    version.style.top = `${880 * scale}px`;
+    version.style.fontSize = `${16 * scale}px`;
+  }
+}
+
 
 // 离开网格恢复默认图（同样等加载好再切）
 grid.addEventListener('mouseleave', () => {
@@ -417,6 +531,10 @@ async function preloadAllImages() {
 // 页面加载完成后开始预加载
 document.addEventListener('DOMContentLoaded', () => {
   preloadAllImages();
+  // 初始化UI布局
+  layoutUI();
+  // 初始化菜单交互
+  setupMenuInteractions();
   
   // 定期验证缓存状态（调试用）
   setInterval(() => {
@@ -425,6 +543,64 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }, 10000); // 每10秒检查一次
 });
+
+// 窗口尺寸变化时，同步更新UI布局
+window.addEventListener('resize', layoutUI);
+
+// 菜单交互功能
+function setupMenuInteractions() {
+  const menuItems = document.querySelectorAll('#uiOverlay .menu div');
+  
+  menuItems.forEach((item, index) => {
+    // 添加点击事件
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // 移除其他菜单项的点击状态
+      menuItems.forEach(otherItem => {
+        otherItem.classList.remove('clicked');
+      });
+      
+      // 添加当前项的点击状态
+      item.classList.add('clicked');
+      
+      // 根据菜单项执行不同操作
+      const menuText = item.textContent.trim();
+      console.log(`点击了菜单项: ${menuText}`);
+      
+      // 这里可以添加具体的功能逻辑
+      switch(menuText) {
+        case '記録':
+          console.log('打开记录功能');
+          break;
+        case 'アルバム':
+          console.log('打开相册功能');
+          break;
+        case '設定':
+          console.log('打开设置功能');
+          break;
+        default:
+          console.log('未知菜单项');
+      }
+      
+      // 2秒后移除点击状态
+      setTimeout(() => {
+        item.classList.remove('clicked');
+      }, 2000);
+    });
+    
+    // 添加鼠标进入事件
+    item.addEventListener('mouseenter', () => {
+      console.log(`鼠标悬浮: ${item.textContent.trim()}`);
+    });
+    
+    // 添加鼠标离开事件
+    item.addEventListener('mouseleave', () => {
+      // 可以在这里添加离开时的效果
+    });
+  });
+}
 
 // 添加全局缓存验证函数（调试用）
 window.validateImageCache = validateCache;
@@ -678,23 +854,38 @@ for (let r = 1; r <= 12; r++) {
     if (isEdge) {
       cell.classList.add('disabled');
     } else {
-      // 检查是否是AI识别区域
-      const aiRegion = setupAIRegion(r, c);
+      // 检查是否是蓝色区域（显示0-0图片）
+      const isBlueRegion = (
+        // 第一个蓝色块：行2-4，列12-22
+        (r >= 2 && r <= 4 && c >= 12 && c <= 22) ||
+        // 第二个蓝色块：行5-11，列19-22
+        (r >= 5 && r <= 11 && c >= 19 && c <= 22)
+      );
       
-      if (aiRegion.isAIRegion) {
-        // AI识别区域：悬停时显示该区域的识别框
+      if (isBlueRegion) {
+        // 蓝色区域：悬停时显示0-0图片
         cell.addEventListener('mouseenter', () => {
-          switchTo(`home/${r}-${c}.png`);
-          safeShowAIRegions(aiRegion.regionKey);
-        });
-        cell.addEventListener('mouseleave', () => {
-          safeHideAIRegions();
+          switchTo('home/0-0.png');
         });
       } else {
-        // 普通区域：只切换背景
-        cell.addEventListener('mouseenter', () => {
-          switchTo(`home/${r}-${c}.png`);
-        });
+        // 检查是否是AI识别区域
+        const aiRegion = setupAIRegion(r, c);
+        
+        if (aiRegion.isAIRegion) {
+          // AI识别区域：悬停时显示该区域的识别框
+          cell.addEventListener('mouseenter', () => {
+            switchTo(`home/${r}-${c}.png`);
+            safeShowAIRegions(aiRegion.regionKey);
+          });
+          cell.addEventListener('mouseleave', () => {
+            safeHideAIRegions();
+          });
+        } else {
+          // 普通区域：只切换背景
+          cell.addEventListener('mouseenter', () => {
+            switchTo(`home/${r}-${c}.png`);
+          });
+        }
       }
     }
     grid.appendChild(cell);
