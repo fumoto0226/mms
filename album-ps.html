@@ -3,107 +3,817 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>P图功能页示例</title>
-<script src="https://unpkg.com/konva@9.3.3/konva.min.js"></script>
+<title>Alien 贴图编辑器</title>
 <style>
-  body { margin: 0; background: #222; color: #fff; text-align: center; }
-  #stage-container { margin-top: 20px; display: inline-block; background: #333; }
-  .toolbar img {
-    width: 80px;
-    margin: 10px;
-    cursor: pointer;
-    border: 2px solid transparent;
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
   }
-  .toolbar img:hover {
-    border-color: #00ccff;
+
+  body {
+    margin: 0;
+    background: #0b0c2a;
+    color: #fff;
+    font-family: 'Arial', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* 背景层 - 星空 */
+  #stars {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+  }
+
+  /* 地球 */
+  .earth {
+    position: fixed;
+    bottom: -120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 200%;
+    max-width: 3000px;
+    height: 400px;
+    background: radial-gradient(circle at 50% 100%, #5fd35e 0%, #4db84c 30%, #3a9a3b 50%, #2d7a2e 70%, #1e5a1f 85%, #0b0c2a 100%);
+    border-top-left-radius: 50%;
+    border-top-right-radius: 50%;
+    animation: float 8s ease-in-out infinite alternate;
+    z-index: 1;
+  }
+
+  @keyframes float {
+    from { transform: translate(-50%, 0); }
+    to { transform: translate(-50%, 15px); }
+  }
+
+  /* 主容器 */
+  .main {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    height: 100vh;
+    padding: 40px;
+    gap: 30px;
+  }
+
+  /* 左侧编辑区 */
+  .left-panel {
+    flex: 0 0 65%;
+    display: flex;
+    flex-direction: column;
+    background: rgba(70, 70, 70, 0.85);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 20px;
+  }
+
+  .left-panel h3 {
+    color: #fff;
+    text-align: left;
+    margin-bottom: 15px;
+    font-size: 18px;
+    font-weight: normal;
+    padding-left: 5px;
+  }
+
+  #editor-wrapper {
+    flex: 1;
+    background: transparent;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #editor-canvas {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  /* 编辑框和控制按钮 */
+  .selection-box {
+    position: absolute;
+    border: 2px dashed #00ccff;
+    pointer-events: none;
+    display: none;
+  }
+
+  .control-btn {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    pointer-events: all;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    transition: transform 0.2s;
+  }
+
+  .control-btn:hover {
+    transform: scale(1.1);
+  }
+
+  .delete-btn {
+    top: -14px;
+    right: -14px;
+    background-color: #ff4444;
+    background-image: url('img/x01.svg');
+  }
+
+  .resize-btn {
+    bottom: -14px;
+    right: -14px;
+    background-color: #00ccff;
+    background-image: url('img/suofang01.svg');
+  }
+
+  .rotate-btn {
+    bottom: -14px;
+    left: -14px;
+    background-color: #e639e0;
+    background-image: url('img/xuanzhuan01.svg');
+  }
+
+  .bottom-btns {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 15px;
+    gap: 15px;
+  }
+
+  .btn {
+    padding: 14px 30px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    color: white;
+    white-space: nowrap;
+  }
+
+  #importBtn {
+    background: linear-gradient(135deg, #e639e0, #d926d4);
+    flex: 0 0 auto;
+  }
+
+  #importBtn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #d926d4, #c91dc5);
+    transform: translateY(-2px);
+  }
+
+  #importBtn:disabled {
+    background: #666;
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  #exportBtn {
+    background: linear-gradient(135deg, #4a7cff, #3b6ae6);
+    flex: 0 0 auto;
+  }
+
+  #exportBtn:hover {
+    background: linear-gradient(135deg, #3b6ae6, #2d5ad4);
+    transform: translateY(-2px);
+  }
+
+  /* 文件名显示区域 */
+  .file-info {
+    flex: 1;
+    display: none;
+    align-items: center;
+    gap: 5px;
+    padding: 0 15px;
+    font-size: 14px;
+    color: #ccc;
+  }
+
+  .file-info.active {
+    display: flex;
+  }
+
+  .file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 1;
+  }
+
+  .remove-file-btn {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    background-image: url('img/x02.svg');
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    flex-shrink: 0;
+    transition: transform 0.2s;
+    margin-left: 0;
+  }
+
+  .remove-file-btn:hover {
+    transform: scale(1.15);
+  }
+
+  /* 右侧贴图选择区 */
+  .right-panel {
+    flex: 0 0 30%;
+    background: rgba(70, 70, 70, 0.85);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 20px;
+    overflow-y: auto;
+  }
+
+  .right-panel h3 {
+    color: #fff;
+    text-align: left;
+    margin-bottom: 20px;
+    font-size: 18px;
+    font-weight: normal;
+  }
+
+  .sticker-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .sticker-item {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 0;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+  }
+
+  .sticker-item:hover {
+    transform: scale(1.05);
+  }
+
+  .sticker-item img {
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+
+  /* 隐藏文件输入 */
+  #fileInput {
+    display: none;
+  }
+
+  /* 加载提示 */
+  .loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #999;
+    font-size: 16px;
+    pointer-events: none;
+  }
+
+  /* 滚动条样式 */
+  .right-panel::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .right-panel::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .right-panel::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+  }
+
+  .right-panel::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
   }
 </style>
 </head>
 <body>
-  <h2>上传照片，添加贴图 🎨</h2>
-  <input type="file" id="upload" accept="image/*"><br>
-  <div id="stage-container"></div>
-  <div class="toolbar">
-    <img src="stickers/hat.png" alt="帽子" onclick="addSticker('stickers/hat.png')">
-    <img src="stickers/glasses.png" alt="眼镜" onclick="addSticker('stickers/glasses.png')">
-    <img src="stickers/flower.png" alt="花" onclick="addSticker('stickers/flower.png')">
+  <!-- 背景层 -->
+  <canvas id="stars"></canvas>
+  <div class="earth"></div>
+
+  <!-- 主内容区 -->
+  <div class="main">
+    <!-- 左侧编辑区 -->
+    <div class="left-panel">
+      <h3>图片编辑</h3>
+      <div id="editor-wrapper">
+        <canvas id="editor-canvas"></canvas>
+        <div class="loading" id="loading">请导入图片开始编辑</div>
+        <div class="selection-box" id="selection-box">
+          <div class="control-btn delete-btn" id="delete-btn"></div>
+          <div class="control-btn resize-btn" id="resize-btn"></div>
+          <div class="control-btn rotate-btn" id="rotate-btn"></div>
+        </div>
+      </div>
+      <div class="bottom-btns">
+        <button id="importBtn" class="btn">导入图片</button>
+        <div class="file-info" id="file-info">
+          <span class="file-name" id="file-name"></span>
+          <div class="remove-file-btn" id="remove-file-btn"></div>
+        </div>
+        <button id="exportBtn" class="btn">导出图片</button>
+      </div>
+    </div>
+
+    <!-- 右侧贴图选择区 -->
+    <div class="right-panel">
+      <h3>Alien素材</h3>
+      <div class="sticker-list" id="sticker-list">
+        <!-- 动态加载贴图 -->
+      </div>
+    </div>
   </div>
-  <button onclick="exportImage()">导出图片</button>
+
+  <!-- 隐藏的文件输入 -->
+  <input type="file" id="fileInput" accept="image/*">
 
 <script>
-let stage, layer, backgroundImage;
+// 全局变量
+let canvas, ctx;
+let backgroundImage = null;
+let currentFileName = null;
+let stickers = [];
+let selectedSticker = null;
+let isDragging = false;
+let isResizing = false;
+let isRotating = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let lastMouseX = 0;
+let lastMouseY = 0;
 
-function initStage() {
-  stage = new Konva.Stage({
-    container: 'stage-container',
-    width: 500,
-    height: 500,
-  });
-  layer = new Konva.Layer();
-  stage.add(layer);
+// 贴图对象类
+class Sticker {
+  constructor(img, x, y, width, height) {
+    this.img = img;
+    this.x = x;
+    this.y = y;
+    this.width = width;
+    this.height = height;
+    this.rotation = 0;
+    this.scaleX = 1;
+    this.scaleY = 1;
+  }
+
+  draw(ctx) {
+    ctx.save();
+    ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+    ctx.rotate(this.rotation);
+    ctx.scale(this.scaleX, this.scaleY);
+    ctx.drawImage(this.img, -this.width / 2, -this.height / 2, this.width, this.height);
+    ctx.restore();
+  }
+
+  contains(x, y) {
+    const dx = x - (this.x + this.width / 2);
+    const dy = y - (this.y + this.height / 2);
+    const cos = Math.cos(-this.rotation);
+    const sin = Math.sin(-this.rotation);
+    const localX = dx * cos - dy * sin;
+    const localY = dx * sin + dy * cos;
+    
+    return Math.abs(localX) <= (this.width * this.scaleX) / 2 && 
+           Math.abs(localY) <= (this.height * this.scaleY) / 2;
+  }
+
+  getBounds() {
+    const hw = (this.width * this.scaleX) / 2;
+    const hh = (this.height * this.scaleY) / 2;
+    const cx = this.x + this.width / 2;
+    const cy = this.y + this.height / 2;
+    
+    return {
+      left: cx - hw,
+      top: cy - hh,
+      width: hw * 2,
+      height: hh * 2,
+      centerX: cx,
+      centerY: cy
+    };
+  }
 }
 
+// 初始化星空
+function initStars() {
+  const starCanvas = document.getElementById('stars');
+  const starCtx = starCanvas.getContext('2d');
+  
+  function resizeStarCanvas() {
+    starCanvas.width = window.innerWidth;
+    starCanvas.height = window.innerHeight;
+  }
+  
+  resizeStarCanvas();
+  window.addEventListener('resize', resizeStarCanvas);
+  
+  const stars = [];
+  const numStars = 150;
+  
+  for (let i = 0; i < numStars; i++) {
+    stars.push({
+      x: Math.random() * starCanvas.width,
+      y: Math.random() * starCanvas.height,
+      size: Math.random() * 1.5 + 0.5,
+      opacity: Math.random(),
+      twinkleSpeed: Math.random() * 0.015 + 0.005
+    });
+  }
+  
+  function animateStars() {
+    starCtx.clearRect(0, 0, starCanvas.width, starCanvas.height);
+    
+    stars.forEach(star => {
+      star.opacity += star.twinkleSpeed;
+      if (star.opacity > 1) star.opacity = 0;
+      
+      starCtx.beginPath();
+      starCtx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+      starCtx.fillStyle = `rgba(255, 255, 255, ${Math.abs(Math.sin(star.opacity * Math.PI))})`;
+      starCtx.fill();
+    });
+    
+    requestAnimationFrame(animateStars);
+  }
+  
+  animateStars();
+}
+
+// 初始化编辑画布
+function initCanvas() {
+  canvas = document.getElementById('editor-canvas');
+  ctx = canvas.getContext('2d');
+  
+  // 初始设置一个默认大小
+  canvas.width = 800;
+  canvas.height = 600;
+  
+  // 鼠标事件
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('mousemove', onMouseMove);
+  canvas.addEventListener('mouseup', onMouseUp);
+  canvas.addEventListener('mouseleave', onMouseUp);
+}
+
+// 调整Canvas大小以匹配背景图片
+function resizeCanvasToBackground() {
+  if (backgroundImage) {
+    canvas.width = backgroundImage.img.width;
+    canvas.height = backgroundImage.img.height;
+  }
+  redraw();
+}
+
+// 重绘画布
+function redraw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // 绘制背景图
+  if (backgroundImage) {
+    ctx.drawImage(backgroundImage.img, 0, 0, canvas.width, canvas.height);
+    
+    // 只在背景图片范围内绘制贴图
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, canvas.width, canvas.height);
+    ctx.clip();
+    
+    // 绘制所有贴图
+    stickers.forEach(sticker => sticker.draw(ctx));
+    
+    ctx.restore();
+  }
+  
+  // 更新选择框
+  updateSelectionBox();
+}
+
+// 加载背景图片
 function loadBackground(file) {
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = (e) => {
     const img = new Image();
     img.onload = () => {
-      const ratio = Math.min(500 / img.width, 500 / img.height);
-      const w = img.width * ratio;
-      const h = img.height * ratio;
-
-      if (backgroundImage) backgroundImage.destroy();
-
-      backgroundImage = new Konva.Image({
-        image: img,
-        width: w,
-        height: h,
-        x: (500 - w) / 2,
-        y: (500 - h) / 2,
-      });
-      layer.add(backgroundImage);
-      layer.draw();
+      backgroundImage = { img };
+      currentFileName = file.name;
+      
+      // 调整Canvas大小以匹配图片
+      resizeCanvasToBackground();
+      
+      // 更新UI
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('importBtn').disabled = true;
+      document.getElementById('file-info').classList.add('active');
+      document.getElementById('file-name').textContent = currentFileName;
     };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
 
-document.getElementById('upload').addEventListener('change', e => {
-  if (e.target.files.length > 0) {
-    loadBackground(e.target.files[0]);
-  }
-});
+// 移除背景图片
+function removeBackground() {
+  backgroundImage = null;
+  currentFileName = null;
+  stickers = [];
+  selectedSticker = null;
+  
+  // 重置Canvas大小
+  canvas.width = 800;
+  canvas.height = 600;
+  
+  // 更新UI
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('importBtn').disabled = false;
+  document.getElementById('file-info').classList.remove('active');
+  document.getElementById('file-name').textContent = '';
+  
+  redraw();
+}
 
+// 添加贴图
 function addSticker(src) {
+  if (!backgroundImage) {
+    alert('请先导入背景图片');
+    return;
+  }
+  
   const img = new Image();
   img.onload = () => {
-    const sticker = new Konva.Image({
-      image: img,
-      x: 250 - img.width / 4,
-      y: 250 - img.height / 4,
-      width: img.width / 2,
-      height: img.height / 2,
-      draggable: true,
-    });
-    // 支持缩放旋转
-    const tr = new Konva.Transformer({ nodes: [sticker], enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'], rotateEnabled: true });
-    layer.add(sticker);
-    layer.add(tr);
-    layer.draw();
+    const maxSize = Math.min(canvas.width, canvas.height) / 5;
+    const ratio = Math.min(maxSize / img.width, maxSize / img.height);
+    const w = img.width * ratio;
+    const h = img.height * ratio;
+    const x = (canvas.width - w) / 2;
+    const y = (canvas.height - h) / 2;
+    
+    const sticker = new Sticker(img, x, y, w, h);
+    stickers.push(sticker);
+    selectedSticker = sticker;
+    redraw();
   };
   img.src = src;
 }
 
+// 更新选择框
+function updateSelectionBox() {
+  const selectionBox = document.getElementById('selection-box');
+  
+  if (selectedSticker && backgroundImage) {
+    const bounds = selectedSticker.getBounds();
+    const canvasRect = canvas.getBoundingClientRect();
+    const wrapperRect = document.getElementById('editor-wrapper').getBoundingClientRect();
+    
+    // Canvas相对于wrapper的偏移
+    const canvasOffsetX = canvasRect.left - wrapperRect.left;
+    const canvasOffsetY = canvasRect.top - wrapperRect.top;
+    
+    // 计算显示缩放比例
+    const displayScale = canvasRect.width / canvas.width;
+    
+    const centerX = canvasOffsetX + bounds.centerX * displayScale;
+    const centerY = canvasOffsetY + bounds.centerY * displayScale;
+    const width = bounds.width * displayScale;
+    const height = bounds.height * displayScale;
+    
+    selectionBox.style.display = 'block';
+    selectionBox.style.left = centerX + 'px';
+    selectionBox.style.top = centerY + 'px';
+    selectionBox.style.width = width + 'px';
+    selectionBox.style.height = height + 'px';
+    selectionBox.style.transform = `translate(-50%, -50%) rotate(${selectedSticker.rotation}rad)`;
+    selectionBox.style.transformOrigin = 'center center';
+  } else {
+    selectionBox.style.display = 'none';
+  }
+}
+
+// 鼠标按下
+function onMouseDown(e) {
+  const rect = canvas.getBoundingClientRect();
+  const displayScale = rect.width / canvas.width;
+  const x = (e.clientX - rect.left) / displayScale;
+  const y = (e.clientY - rect.top) / displayScale;
+  
+  // 从上到下检查点击
+  selectedSticker = null;
+  for (let i = stickers.length - 1; i >= 0; i--) {
+    if (stickers[i].contains(x, y)) {
+      selectedSticker = stickers[i];
+      isDragging = true;
+      dragStartX = x - selectedSticker.x;
+      dragStartY = y - selectedSticker.y;
+      break;
+    }
+  }
+  
+  lastMouseX = x;
+  lastMouseY = y;
+  redraw();
+}
+
+// 鼠标移动
+function onMouseMove(e) {
+  if (!selectedSticker) return;
+  
+  const rect = canvas.getBoundingClientRect();
+  const displayScale = rect.width / canvas.width;
+  const x = (e.clientX - rect.left) / displayScale;
+  const y = (e.clientY - rect.top) / displayScale;
+  
+  if (isDragging) {
+    selectedSticker.x = x - dragStartX;
+    selectedSticker.y = y - dragStartY;
+    redraw();
+  } else if (isResizing) {
+    const bounds = selectedSticker.getBounds();
+    const dx = x - bounds.centerX;
+    const dy = y - bounds.centerY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const initialDist = Math.sqrt(
+      Math.pow(lastMouseX - bounds.centerX, 2) + 
+      Math.pow(lastMouseY - bounds.centerY, 2)
+    );
+    const scale = dist / initialDist;
+    
+    selectedSticker.scaleX *= scale;
+    selectedSticker.scaleY *= scale;
+    
+    lastMouseX = x;
+    lastMouseY = y;
+    redraw();
+  } else if (isRotating) {
+    const bounds = selectedSticker.getBounds();
+    const angle = Math.atan2(y - bounds.centerY, x - bounds.centerX);
+    const lastAngle = Math.atan2(lastMouseY - bounds.centerY, lastMouseX - bounds.centerX);
+    selectedSticker.rotation += angle - lastAngle;
+    
+    lastMouseX = x;
+    lastMouseY = y;
+    redraw();
+  }
+}
+
+// 鼠标释放
+function onMouseUp() {
+  isDragging = false;
+  isResizing = false;
+  isRotating = false;
+}
+
+// 删除贴图
+function deleteSticker() {
+  if (selectedSticker) {
+    stickers = stickers.filter(s => s !== selectedSticker);
+    selectedSticker = null;
+    redraw();
+  }
+}
+
+// 导出图片
 function exportImage() {
-  const dataURL = stage.toDataURL({ mimeType: 'image/png' });
+  if (!backgroundImage) {
+    alert('请先导入背景图片');
+    return;
+  }
+  
+  // 直接导出当前Canvas内容（已经是原始尺寸）
+  const dataURL = canvas.toDataURL('image/png', 1.0);
   const link = document.createElement('a');
-  link.download = 'p图作品.png';
+  link.download = 'alien-editor-' + Date.now() + '.png';
   link.href = dataURL;
   link.click();
 }
 
-initStage();
+// 加载素材列表
+function loadStickerList() {
+  const stickerList = document.getElementById('sticker-list');
+  const alienFiles = ['alien001.svg', 'alien002.svg', 'alien003.svg'];
+  
+  alienFiles.forEach(filename => {
+    const item = document.createElement('div');
+    item.className = 'sticker-item';
+    
+    const img = document.createElement('img');
+    img.src = `alien/${filename}`;
+    img.alt = filename;
+    
+    item.appendChild(img);
+    item.onclick = () => addSticker(`alien/${filename}`);
+    
+    stickerList.appendChild(item);
+  });
+}
+
+// 初始化事件监听
+document.addEventListener('DOMContentLoaded', () => {
+  initStars();
+  initCanvas();
+  loadStickerList();
+  
+  // 导入按钮
+  document.getElementById('importBtn').onclick = () => {
+    document.getElementById('fileInput').click();
+  };
+  
+  // 文件选择
+  document.getElementById('fileInput').onchange = (e) => {
+    if (e.target.files.length > 0) {
+      loadBackground(e.target.files[0]);
+    }
+  };
+  
+  // 导出按钮
+  document.getElementById('exportBtn').onclick = exportImage;
+  
+  // 移除文件按钮
+  document.getElementById('remove-file-btn').onclick = removeBackground;
+  
+  // 删除贴图按钮
+  document.getElementById('delete-btn').onclick = deleteSticker;
+  
+  // 缩放按钮
+  document.getElementById('resize-btn').onmousedown = (e) => {
+    e.stopPropagation();
+    if (selectedSticker) {
+      isResizing = true;
+      const rect = canvas.getBoundingClientRect();
+      const displayScale = rect.width / canvas.width;
+      lastMouseX = (e.clientX - rect.left) / displayScale;
+      lastMouseY = (e.clientY - rect.top) / displayScale;
+    }
+  };
+  
+  // 旋转按钮 - 左下角
+  document.getElementById('rotate-btn').onmousedown = (e) => {
+    e.stopPropagation();
+    if (selectedSticker) {
+      isRotating = true;
+      const rect = canvas.getBoundingClientRect();
+      const displayScale = rect.width / canvas.width;
+      lastMouseX = (e.clientX - rect.left) / displayScale;
+      lastMouseY = (e.clientY - rect.top) / displayScale;
+    }
+  };
+  
+  // 全局鼠标事件
+  document.addEventListener('mousemove', (e) => {
+    if (isResizing || isRotating) {
+      onMouseMove(e);
+    }
+  });
+  
+  document.addEventListener('mouseup', () => {
+    isResizing = false;
+    isRotating = false;
+  });
+  
+  // 点击空白区域取消选中
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const displayScale = rect.width / canvas.width;
+    const x = (e.clientX - rect.left) / displayScale;
+    const y = (e.clientY - rect.top) / displayScale;
+    
+    let found = false;
+    for (let i = stickers.length - 1; i >= 0; i--) {
+      if (stickers[i].contains(x, y)) {
+        found = true;
+        break;
+      }
+    }
+    
+    if (!found) {
+      selectedSticker = null;
+      redraw();
+    }
+  });
+});
 </script>
 </body>
 </html>
+
