@@ -124,25 +124,47 @@
     transform: scale(1.1);
   }
 
+  .layer-up-btn:hover,
+  .layer-down-btn:hover {
+    transform: translateX(-50%) scale(1.1);
+  }
+
   .delete-btn {
     top: -14px;
     right: -14px;
-    background-color: #ff4444;
     background-image: url('img/x01.svg');
   }
 
   .resize-btn {
     bottom: -14px;
     right: -14px;
-    background-color: #00ccff;
     background-image: url('img/suofang01.svg');
   }
 
   .rotate-btn {
     bottom: -14px;
     left: -14px;
-    background-color: #e639e0;
     background-image: url('img/xuanzhuan01.svg');
+  }
+
+  .flip-btn {
+    top: -14px;
+    left: -14px;
+    background-image: url('img/fanzhuan01.svg');
+  }
+
+  .layer-up-btn {
+    top: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-image: url('img/shangyi01.svg');
+  }
+
+  .layer-down-btn {
+    bottom: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-image: url('img/xiayi01.svg');
   }
 
   .bottom-btns {
@@ -309,12 +331,58 @@
   .right-panel::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.5);
   }
+
+  /* 返回按钮样式 */
+  .back-btn {
+    position: fixed;
+    top: 30px;
+    left: 30px;
+    width: 50px;
+    height: 50px;
+    background: rgba(70, 70, 70, 0.85);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 100;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+  }
+
+  .back-btn:hover {
+    background: rgba(100, 100, 100, 0.95);
+    border-color: #00ccff;
+    transform: translateX(-5px) scale(1.1);
+    box-shadow: 0 0 20px rgba(0, 204, 255, 0.5);
+  }
+
+  .back-btn:active {
+    transform: translateX(-3px) scale(1.05);
+    background: rgba(120, 120, 120, 0.95);
+  }
+
+  .back-btn img {
+    width: 28px;
+    height: 28px;
+    transition: transform 0.3s ease;
+  }
+
+  .back-btn:hover img {
+    transform: translateX(-3px);
+  }
 </style>
 </head>
 <body>
   <!-- 背景层 -->
   <canvas id="stars"></canvas>
   <div class="earth"></div>
+
+  <!-- 返回按钮 -->
+  <div class="back-btn" id="back-btn" title="返回首页">
+    <img src="img/back01.svg" alt="返回">
+  </div>
 
   <!-- 主内容区 -->
   <div class="main">
@@ -328,6 +396,9 @@
           <div class="control-btn delete-btn" id="delete-btn"></div>
           <div class="control-btn resize-btn" id="resize-btn"></div>
           <div class="control-btn rotate-btn" id="rotate-btn"></div>
+          <div class="control-btn flip-btn" id="flip-btn"></div>
+          <div class="control-btn layer-up-btn" id="layer-up-btn"></div>
+          <div class="control-btn layer-down-btn" id="layer-down-btn"></div>
         </div>
       </div>
       <div class="bottom-btns">
@@ -397,13 +468,13 @@ class Sticker {
     const localX = dx * cos - dy * sin;
     const localY = dx * sin + dy * cos;
     
-    return Math.abs(localX) <= (this.width * this.scaleX) / 2 && 
-           Math.abs(localY) <= (this.height * this.scaleY) / 2;
+    return Math.abs(localX) <= (this.width * Math.abs(this.scaleX)) / 2 && 
+           Math.abs(localY) <= (this.height * Math.abs(this.scaleY)) / 2;
   }
 
   getBounds() {
-    const hw = (this.width * this.scaleX) / 2;
-    const hh = (this.height * this.scaleY) / 2;
+    const hw = (this.width * Math.abs(this.scaleX)) / 2;
+    const hh = (this.height * Math.abs(this.scaleY)) / 2;
     const cx = this.x + this.width / 2;
     const cy = this.y + this.height / 2;
     
@@ -694,6 +765,38 @@ function deleteSticker() {
   }
 }
 
+// 镜像翻转贴图
+function flipSticker() {
+  if (selectedSticker) {
+    selectedSticker.scaleX *= -1;
+    redraw();
+  }
+}
+
+// 上移图层
+function moveLayerUp() {
+  if (selectedSticker) {
+    const index = stickers.indexOf(selectedSticker);
+    if (index < stickers.length - 1) {
+      // 与上一层交换位置
+      [stickers[index], stickers[index + 1]] = [stickers[index + 1], stickers[index]];
+      redraw();
+    }
+  }
+}
+
+// 下移图层
+function moveLayerDown() {
+  if (selectedSticker) {
+    const index = stickers.indexOf(selectedSticker);
+    if (index > 0) {
+      // 与下一层交换位置
+      [stickers[index], stickers[index - 1]] = [stickers[index - 1], stickers[index]];
+      redraw();
+    }
+  }
+}
+
 // 导出图片
 function exportImage() {
   if (!backgroundImage) {
@@ -735,6 +838,11 @@ document.addEventListener('DOMContentLoaded', () => {
   initCanvas();
   loadStickerList();
   
+  // 返回按钮
+  document.getElementById('back-btn').onclick = () => {
+    window.location.href = 'index.html';
+  };
+  
   // 导入按钮
   document.getElementById('importBtn').onclick = () => {
     document.getElementById('fileInput').click();
@@ -754,7 +862,28 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('remove-file-btn').onclick = removeBackground;
   
   // 删除贴图按钮
-  document.getElementById('delete-btn').onclick = deleteSticker;
+  document.getElementById('delete-btn').onclick = (e) => {
+    e.stopPropagation();
+    deleteSticker();
+  };
+  
+  // 镜像翻转按钮
+  document.getElementById('flip-btn').onclick = (e) => {
+    e.stopPropagation();
+    flipSticker();
+  };
+  
+  // 上移图层按钮
+  document.getElementById('layer-up-btn').onclick = (e) => {
+    e.stopPropagation();
+    moveLayerUp();
+  };
+  
+  // 下移图层按钮
+  document.getElementById('layer-down-btn').onclick = (e) => {
+    e.stopPropagation();
+    moveLayerDown();
+  };
   
   // 缩放按钮
   document.getElementById('resize-btn').onmousedown = (e) => {
