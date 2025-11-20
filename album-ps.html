@@ -13,7 +13,7 @@
 
   body {
     margin: 0;
-    background: #050617;
+    background: #010206;
     color: #fff;
     font-family: 'Arial', sans-serif;
     overflow: hidden;
@@ -29,6 +29,30 @@
     height: 100%;
     z-index: 0;
     pointer-events: none;
+    overflow: hidden;
+    background: radial-gradient(circle at 20% 20%, rgba(15, 23, 42, 0.65), rgba(5, 6, 23, 0) 55%),
+      radial-gradient(circle at 80% 20%, rgba(49, 46, 129, 0.35), rgba(5, 6, 23, 0) 65%);
+  }
+
+  #stars .star {
+    position: absolute;
+    border-radius: 150%;
+    background: radial-gradient(circle, rgb(255, 255, 255), rgba(255, 255, 255, 0.535));
+    opacity: 1.35;
+    animation: starBlink var(--blink-duration, 0.5s) ease-in-out infinite;
+    transform-origin: center;
+    filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.838));
+  }
+
+  @keyframes starBlink {
+    0%, 100% {
+      opacity: 0.25;
+      transform: scale(0.75);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.2);
+    }
   }
 
   .earth {
@@ -55,9 +79,9 @@
     inset: -55% -40% -5%;
     background-image: url('img/7q.png');
     background-repeat: repeat-x;
-    background-size: 55%;
-    background-position: 0% 55%;
-    animation: texture-spin 610s linear infinite;
+    background-size: 2620px auto;
+    background-position: 0px 55%;
+    animation: texture-spin 210s linear infinite;
     transform: perspective(1200px) rotateX(30deg) scaleY(1.15);
     transform-origin: center bottom;
     pointer-events: none;
@@ -80,8 +104,8 @@
   }
 
   @keyframes texture-spin {
-    0% { background-position: 0% 60%; }
-    100% { background-position: -400% 60%; }
+    0% { background-position: 0px 60%; }
+    100% { background-position: -2880px 60%; }
   }
 
   /* メインコンテナ */
@@ -538,12 +562,117 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   }
 
-  .right-panel h3 {
+  .sticker-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .sticker-panel-header h3 {
     color: #fff;
     text-align: left;
-    margin-bottom: 20px;
+    margin: 0;
     font-size: 18px;
     font-weight: normal;
+    flex: 1 1 auto;
+    min-height: 1em;
+  }
+
+  .category-tabs {
+    display: inline-flex;
+    padding: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    gap: 4px;
+    flex: 0 0 auto;
+  }
+
+  .category-tab {
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(4px);
+  }
+
+  .category-tab .tab-label {
+    letter-spacing: 0.08em;
+  }
+
+  .category-tab .alien-icon {
+    width: 16px;
+    height: 16px;
+    background-image: url('img/suofang01.svg');
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center;
+    display: inline-block;
+    opacity: 0.8;
+    transition: transform 0.4s ease, opacity 0.3s ease;
+    filter: drop-shadow(0 0 4px rgba(132, 204, 22, 0.4));
+  }
+
+  .category-tab .rotate-icon {
+    width: 16px;
+    height: 16px;
+    background-image: url('img/xuanzhuan01.svg');
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center;
+    display: inline-block;
+    opacity: 0.7;
+    transition: transform 0.4s ease, opacity 0.3s ease;
+  }
+
+  .category-tab.active {
+    background: rgba(99, 102, 241, 0.18);
+    color: #fff;
+    box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.4);
+  }
+
+  .category-tab.active .rotate-icon {
+    opacity: 1;
+  }
+
+  .category-tab.active .alien-icon {
+    opacity: 1;
+    animation: tabSpin 1.4s linear infinite;
+  }
+
+  .category-tab[data-category="daoju"].rotate {
+    animation: tabPulse 0.6s ease;
+  }
+
+  .category-tab[data-category="daoju"].active .rotate-icon {
+    animation: tabSpin 1.6s linear infinite;
+  }
+
+  .category-tab:not(.active):hover {
+    color: rgba(255, 255, 255, 0.95);
+    transform: translateY(-1px);
+  }
+
+  @keyframes tabSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes tabPulse {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.05); }
+    100% { transform: scale(1); }
   }
 
   .sticker-list {
@@ -637,7 +766,7 @@
   }
 
   .back-btn:hover {
-    background: rgba(99, 102, 241, 0.2);
+    background: rgba(6, 6, 23, 0.537);
     border-color: #6366f1;
     transform: translateX(-4px);
     box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
@@ -661,7 +790,7 @@
 </head>
 <body>
   <!-- 背景レイヤー -->
-  <canvas id="stars"></canvas>
+  <div id="stars"></div>
   <div class="earth"></div>
 
   <!-- 戻るボタン -->
@@ -723,7 +852,19 @@
 
     <!-- 右パネル（スタンプ） -->
     <div class="right-panel">
-      <h3>Alien素材ライブラリ</h3>
+      <div class="sticker-panel-header">
+        <h3 aria-label="素材ライブラリ"></h3>
+        <div class="category-tabs" id="sticker-category-tabs">
+          <button class="category-tab active" data-category="alien">
+            <span class="alien-icon" aria-hidden="true"></span>
+            <span class="tab-label">エイリアン</span>
+          </button>
+          <button class="category-tab" data-category="daoju">
+            <span class="rotate-icon" aria-hidden="true"></span>
+            <span class="tab-label">道具</span>
+          </button>
+        </div>
+      </div>
       <div class="sticker-list" id="sticker-list">
         <!-- スタンプを動的に読み込み -->
       </div>
@@ -750,56 +891,81 @@ let lastMouseY = 0;
 let importHoverTimeout = null;
 let postHoverTimeout = null;
 let exportHoverTimeout = null;
+let draggedStickerSrc = null;
+const STICKER_CATEGORIES = {
+  alien: {
+    label: 'エイリアン',
+    folder: 'alien',
+    files: ['alien001.svg', 'alien002.svg', 'alien003.svg']
+  },
+  daoju: {
+    label: '道具',
+    folder: 'daoju',
+    files: ['daoju01.svg', 'daoju02.svg']
+  }
+};
+let currentStickerCategory = 'alien';
+let starResizeTimer = null;
 
 // 星空背景の初期化
 function initStars() {
-  const starCanvas = document.getElementById('stars');
-  if (!starCanvas) {
+  const starField = document.getElementById('stars');
+  if (!starField) {
     return;
   }
-  const starCtx = starCanvas.getContext('2d');
 
-  function resizeStarCanvas() {
-    starCanvas.width = window.innerWidth;
-    starCanvas.height = window.innerHeight;
+  const STAR_COUNT = 140;
+  const MIN_SIZE = 1.4;
+  const MAX_SIZE = 3.6;
+
+  const fragment = document.createDocumentFragment();
+
+  function setRandomStarPosition(star) {
+    star.style.left = `${(Math.random() * 100).toFixed(2)}%`;
+    star.style.top = `${(Math.random() * 100).toFixed(2)}%`;
   }
 
-  resizeStarCanvas();
-  window.addEventListener('resize', resizeStarCanvas);
+  for (let i = 0; i < STAR_COUNT; i++) {
+    const star = document.createElement('span');
+    star.className = 'star';
+    const size = (MIN_SIZE + Math.random() * (MAX_SIZE - MIN_SIZE)).toFixed(2);
+    star.style.width = `${size}px`;
+    star.style.height = `${size}px`;
+    setRandomStarPosition(star);
+    star.style.opacity = (0.35 + Math.random() * 0.6).toFixed(2);
+    star.style.animationDelay = `${(Math.random() * 4).toFixed(2)}s`;
+    star.style.animationDuration = `${(0.6 + Math.random() * 1.2).toFixed(2)}s`;
 
-  const stars = [];
-  const numStars = 150;
+    if (Math.random() > 0.65) {
+      star.style.filter = 'drop-shadow(0 0 6px rgba(99, 102, 241, 0.5))';
+    } else if (Math.random() > 0.35) {
+      star.style.filter = 'drop-shadow(0 0 6px rgba(34, 197, 94, 0.4))';
+    }
 
-  for (let i = 0; i < numStars; i++) {
-    stars.push({
-      x: Math.random() * starCanvas.width,
-      y: Math.random() * starCanvas.height,
-      size: Math.random() * 1.5 + 0.5,
-      opacity: Math.random(),
-      twinkleSpeed: Math.random() * 0.015 + 0.005
-    });
-  }
+    const shouldReposition = Math.random() < 0.5;
+    star.dataset.reposition = shouldReposition ? '1' : '0';
 
-  function animateStars() {
-    starCtx.clearRect(0, 0, starCanvas.width, starCanvas.height);
-
-    stars.forEach(star => {
-      star.opacity += star.twinkleSpeed;
-      if (star.opacity > 1) {
-        star.opacity = 0;
+    star.addEventListener('animationiteration', () => {
+      if (star.dataset.reposition === '1') {
+        setRandomStarPosition(star);
       }
-
-      starCtx.beginPath();
-      starCtx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
-      starCtx.fillStyle = `rgba(255, 255, 255, ${Math.abs(Math.sin(star.opacity * Math.PI))})`;
-      starCtx.fill();
     });
 
-    requestAnimationFrame(animateStars);
+    fragment.appendChild(star);
   }
 
-  animateStars();
+  starField.innerHTML = '';
+  starField.appendChild(fragment);
 }
+
+window.addEventListener('resize', () => {
+  if (starResizeTimer) {
+    clearTimeout(starResizeTimer);
+  }
+  starResizeTimer = setTimeout(() => {
+    initStars();
+  }, 300);
+});
 
 // ステッカーオブジェクトクラス
 class Sticker {
@@ -1038,7 +1204,7 @@ function removeBackground() {
 }
 
 // ステッカーを追加
-function addSticker(src) {
+function addSticker(src, dropPosition = null) {
   if (!backgroundImage) {
     alert('先に背景画像をインポートしてください');
     return;
@@ -1050,8 +1216,8 @@ function addSticker(src) {
     const ratio = Math.min(maxSize / img.width, maxSize / img.height);
     const w = img.width * ratio;
     const h = img.height * ratio;
-    const x = (canvas.width - w) / 2;
-    const y = (canvas.height - h) / 2;
+    const x = dropPosition ? dropPosition.x - w / 2 : (canvas.width - w) / 2;
+    const y = dropPosition ? dropPosition.y - h / 2 : (canvas.height - h) / 2;
     
     const sticker = new Sticker(img, x, y, w, h);
     stickers.push(sticker);
@@ -1059,6 +1225,90 @@ function addSticker(src) {
     redraw();
   };
   img.src = src;
+}
+
+function handleStickerDragStart(e) {
+  const src = e.currentTarget.dataset.src;
+  if (!src) {
+    return;
+  }
+  draggedStickerSrc = src;
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('application/sticker-src', src);
+  }
+}
+
+function handleStickerDragEnd() {
+  draggedStickerSrc = null;
+}
+
+function handleStickerDrop(e) {
+  if (e.stopPropagation) {
+    e.stopPropagation();
+  }
+  const dataTransfer = e.dataTransfer;
+  const src = draggedStickerSrc || (dataTransfer ? dataTransfer.getData('application/sticker-src') : null);
+  if (!src) {
+    return;
+  }
+  if (!backgroundImage) {
+    alert('画像を先に入れてね！');
+    draggedStickerSrc = null;
+    if (dataTransfer) {
+      e.preventDefault();
+    }
+    return;
+  }
+  if (dataTransfer) {
+    e.preventDefault();
+    dataTransfer.dropEffect = 'copy';
+  }
+  const rect = canvas.getBoundingClientRect();
+  if (
+    e.clientX < rect.left ||
+    e.clientX > rect.right ||
+    e.clientY < rect.top ||
+    e.clientY > rect.bottom
+  ) {
+    addSticker(src);
+    draggedStickerSrc = null;
+    return;
+  }
+  const displayScale = rect.width / canvas.width;
+  const x = (e.clientX - rect.left) / displayScale;
+  const y = (e.clientY - rect.top) / displayScale;
+  addSticker(src, { x, y });
+  draggedStickerSrc = null;
+}
+
+function setupDragAndDrop() {
+  const editorWrapper = document.getElementById('editor-wrapper');
+  if (!editorWrapper) {
+    return;
+  }
+  editorWrapper.addEventListener('dragover', (e) => {
+    const transfer = e.dataTransfer;
+    const hasStickerData = transfer && transfer.types && Array.from(transfer.types).includes('application/sticker-src');
+    if (draggedStickerSrc || hasStickerData) {
+      e.preventDefault();
+      if (transfer) {
+        transfer.dropEffect = 'copy';
+      }
+    }
+  });
+  editorWrapper.addEventListener('drop', handleStickerDrop);
+  canvas.addEventListener('dragover', (e) => {
+    const transfer = e.dataTransfer;
+    const hasStickerData = transfer && transfer.types && Array.from(transfer.types).includes('application/sticker-src');
+    if (draggedStickerSrc || hasStickerData) {
+      e.preventDefault();
+      if (transfer) {
+        transfer.dropEffect = 'copy';
+      }
+    }
+  });
+  canvas.addEventListener('drop', handleStickerDrop);
 }
 
 // 選択枠を更新
@@ -1222,31 +1472,74 @@ function exportImage() {
   link.click();
 }
 
+function updateCategoryTabs(selectedKey) {
+  const tabs = document.querySelectorAll('.category-tab');
+  tabs.forEach(tab => {
+    const isActive = tab.dataset.category === selectedKey;
+    tab.classList.toggle('active', isActive);
+    if (tab.dataset.category === 'daoju' && !isActive) {
+      tab.classList.remove('rotate');
+    }
+  });
+}
+
+function setupCategoryTabs() {
+  const tabs = document.querySelectorAll('.category-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const categoryKey = tab.dataset.category;
+      if (categoryKey === currentStickerCategory) {
+        if (categoryKey === 'daoju') {
+          tab.classList.add('rotate');
+          setTimeout(() => tab.classList.remove('rotate'), 600);
+        }
+        return;
+      }
+      loadStickerList(categoryKey);
+    });
+  });
+}
+
 // 素材リストを読み込む
-function loadStickerList() {
+function loadStickerList(categoryKey = 'alien') {
+  const category = STICKER_CATEGORIES[categoryKey] || STICKER_CATEGORIES.alien;
+  currentStickerCategory = categoryKey;
   const stickerList = document.getElementById('sticker-list');
-  const alienFiles = ['alien001.svg', 'alien002.svg', 'alien003.svg'];
+  stickerList.innerHTML = '';
   
-  alienFiles.forEach(filename => {
+  category.files.forEach(filename => {
     const item = document.createElement('div');
     item.className = 'sticker-item';
+    item.draggable = true;
+    item.dataset.src = `${category.folder}/${filename}`;
     
     const img = document.createElement('img');
-    img.src = `alien/${filename}`;
+    img.src = `${category.folder}/${filename}`;
     img.alt = filename;
     
     item.appendChild(img);
-    item.onclick = () => addSticker(`alien/${filename}`);
+    item.onclick = () => {
+      if (!backgroundImage) {
+        return;
+      }
+      addSticker(`${category.folder}/${filename}`);
+    };
+    item.addEventListener('dragstart', handleStickerDragStart);
+    item.addEventListener('dragend', handleStickerDragEnd);
     
     stickerList.appendChild(item);
   });
+
+  updateCategoryTabs(categoryKey);
 }
 
 // イベントリスナーを初期化
 document.addEventListener('DOMContentLoaded', () => {
   initStars();
   initCanvas();
-  loadStickerList();
+  setupCategoryTabs();
+  loadStickerList('alien');
+  setupDragAndDrop();
   updateStatusIndicators();
   
   // 戻るボタン
