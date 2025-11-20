@@ -19,13 +19,33 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: #000;
+    background: radial-gradient(circle at 20% 20%, #1b1a38 0%, #060414 55%, #010005 100%);
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     z-index: 9999;
     transition: opacity 0.5s ease;
+    overflow: hidden;
+  }
+
+  #loading-screen::before,
+  #loading-screen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle at 2px 6px, rgba(255,255,255,0.4) 1px, transparent 1px);
+    background-size: 120px 120px;
+    opacity: 0.6;
+    animation: starDrift 18s linear infinite;
+    pointer-events: none;
+  }
+
+  #loading-screen::after {
+    background-size: 80px 80px;
+    opacity: 0.35;
+    animation-duration: 28s;
+    animation-direction: reverse;
   }
 
   #loading-screen.hidden {
@@ -34,33 +54,147 @@
   }
 
   .loading-title {
-    color: #fff;
+    color: #f6faff;
     font-size: 24px;
-    margin-bottom: 30px;
-    font-family: Arial, sans-serif;
+    margin-bottom: 16px;
+    font-family: 'SF Pro Display', 'Noto Sans JP', Arial, sans-serif;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .flight-scene {
+    position: relative;
+    width: min(520px, 90vw);
+    padding: 48px 0 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
 
   .progress-container {
-    width: 300px;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 2px;
-    overflow: hidden;
+    width: 100%;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.2);
+    overflow: visible;
+    position: relative;
+    box-shadow: 0 0 35px rgba(91, 227, 255, 0.25);
+  }
+
+  .progress-container::before {
+    content: '';
+    position: absolute;
+    inset: -60px -30px;
+    background: radial-gradient(circle at 10% 50%, rgba(255,255,255,0.08), transparent 55%);
+    pointer-events: none;
+    animation: nebulaPulse 6s ease-in-out infinite;
   }
 
   .progress-bar {
+    position: absolute;
+    left: 0;
+    top: 50%;
     height: 100%;
-    background: linear-gradient(90deg, #00ff88, #00ccff);
+    transform: translateY(-50%);
+    background: linear-gradient(90deg, #fff7c5 0%, #8af9ff 35%, #5de0ff 100%);
     width: 0%;
-    transition: width 0.3s ease;
-    border-radius: 2px;
+    border-radius: 999px;
+    box-shadow: 0 0 18px rgba(141, 243, 255, 0.8), 0 0 35px rgba(255, 255, 255, 0.35);
+    transition: width 0.25s ease-out;
+  }
+
+  .space-ship {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 70px;
+    height: 70px;
+    transform: translate(0, -50%) rotate(90deg);
+    transition: transform 0.35s ease-out;
+  }
+
+  .ship-body {
+    position: absolute;
+    inset: 14px 12px;
+    background: linear-gradient(180deg, #ffffff, #c8d7ff);
+    border-radius: 50% 50% 40% 40%;
+    box-shadow: inset 0 -6px 12px rgba(77, 120, 255, 0.4);
+  }
+
+  .ship-cockpit {
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    transform: translateX(-50%);
+    background: linear-gradient(180deg, #98f5ff, #3b7bff);
+    border-radius: 50%;
+    box-shadow: 0 0 12px rgba(80, 191, 255, 0.8);
+  }
+
+  .ship-fin {
+    position: absolute;
+    bottom: 10px;
+    width: 12px;
+    height: 18px;
+    background: linear-gradient(180deg, #ff9d6c, #ff5d5d);
+    border-radius: 30% 30% 60% 60%;
+  }
+
+  .ship-fin-left { left: 8px; transform: rotate(-12deg); }
+  .ship-fin-right { right: 8px; transform: rotate(12deg); }
+
+  .ship-flame {
+    position: absolute;
+    bottom: -18px;
+    left: 50%;
+    width: 14px;
+    height: 26px;
+    transform: translateX(-50%);
+    background: radial-gradient(circle, #fff1c1 15%, #ff9a3c 45%, transparent 70%);
+    border-radius: 50% 50% 50% 50%;
+    animation: flamePulse 0.4s ease-in-out infinite;
+  }
+
+  .earth {
+    position: absolute;
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: clamp(36px, 5vw, 58px);
+    filter: drop-shadow(0 0 12px rgba(79, 165, 255, 0.8)) drop-shadow(0 0 24px rgba(79, 165, 255, 0.4));
+    animation: earthGlow 4s ease-in-out infinite;
   }
 
   .loading-text {
-    color: #fff;
-    margin-top: 20px;
-    font-size: 14px;
-    opacity: 0.8;
+    color: rgba(255, 255, 255, 0.85);
+    margin-top: 32px;
+    font-size: 15px;
+    font-family: 'Noto Sans JP', 'SF Pro Display', Arial, sans-serif;
+    letter-spacing: 0.08em;
+  }
+
+  @keyframes starDrift {
+    from { transform: translateY(0); }
+    to { transform: translateY(120px); }
+  }
+
+  @keyframes flamePulse {
+    0% { transform: translateX(-50%) scaleY(0.8); opacity: 0.7; }
+    50% { transform: translateX(-50%) scaleY(1.2); opacity: 1; }
+    100% { transform: translateX(-50%) scaleY(0.85); opacity: 0.8; }
+  }
+
+  @keyframes earthGlow {
+    0%, 100% { filter: drop-shadow(0 0 12px rgba(79,165,255,0.75)) drop-shadow(0 0 24px rgba(79,165,255,0.35)); }
+    50% { filter: drop-shadow(0 0 18px rgba(79,165,255,0.95)) drop-shadow(0 0 32px rgba(79,165,255,0.55)); }
+  }
+
+  @keyframes nebulaPulse {
+    0%, 100% { opacity: 0.25; }
+    50% { opacity: 0.45; }
   }
 
   #container {
@@ -259,11 +393,21 @@
 <body>
   <!-- 加载界面 -->
   <div id="loading-screen">
-    <div class="loading-title">正在加载中...</div>
-    <div class="progress-container">
-      <div class="progress-bar" id="progress-bar"></div>
+    <div class="loading-title">地球へ向かっています...</div>
+    <div class="flight-scene">
+      <div class="progress-container" id="flight-path">
+        <div class="progress-bar" id="progress-bar"></div>
+        <div class="space-ship" id="space-ship" aria-hidden="true">
+          <div class="ship-body"></div>
+          <div class="ship-cockpit"></div>
+          <div class="ship-fin ship-fin-left"></div>
+          <div class="ship-fin ship-fin-right"></div>
+          <div class="ship-flame"></div>
+        </div>
+        <div class="earth" aria-hidden="true">🌏</div>
+      </div>
     </div>
-    <div class="loading-text" id="loading-text">准备中...</div>
+    <div class="loading-text" id="loading-text">航行進捗 0%</div>
   </div>
 
   <!-- 主界面 -->
@@ -292,6 +436,8 @@ const bgB  = document.getElementById('bgB');
 const loadingScreen = document.getElementById('loading-screen');
 const progressBar = document.getElementById('progress-bar');
 const loadingText = document.getElementById('loading-text');
+const flightPath = document.getElementById('flight-path');
+const spaceShip = document.getElementById('space-ship');
 const container = document.getElementById('container');
 const aiDetectionContainer = document.getElementById('ai-detection-container');
 const uiOverlay = document.getElementById('uiOverlay');
@@ -358,15 +504,29 @@ function preload(url) {
 
 /** 更新加载进度 */
 function updateProgress() {
-  const progress = Math.round((loadedImages / totalImages) * 100);
+  const safeTotal = Math.max(totalImages, 1);
+  const progress = Math.round((loadedImages / safeTotal) * 100);
   progressBar.style.width = progress + '%';
-  loadingText.textContent = `已加载 ${loadedImages}/${totalImages} 张图片 (${progress}%)`;
+  updateShipPosition(progress);
+  loadingText.textContent = `航行進捗 ${progress}%`;
   
   if (loadedImages >= totalImages) {
     setTimeout(() => {
       showMainInterface();
     }, 500); // 延迟500ms显示主界面
   }
+}
+
+function updateShipPosition(progress) {
+  if (!spaceShip || !flightPath) {
+    return;
+  }
+  const pathWidth = flightPath.clientWidth;
+  const shipWidth = spaceShip.clientWidth || 1;
+  const travel = Math.max(pathWidth - shipWidth, 0);
+  const clamped = Math.min(Math.max(progress, 0), 100);
+  const offset = (clamped / 100) * travel;
+  spaceShip.style.transform = `translate(${offset}px, -50%) rotate(90deg)`;
 }
 
 /** 显示主界面 */
@@ -515,7 +675,7 @@ async function preloadAllImages() {
   totalImages = allUrls.length;
   loadedImages = 0;
   
-  loadingText.textContent = `准备加载 ${totalImages} 张图片...`;
+  loadingText.textContent = `搭載画像 ${totalImages} 枚をスキャン中...`;
   
   // 批量预加载所有图片
   const preloadPromises = allUrls.map(url => 
