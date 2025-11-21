@@ -320,7 +320,7 @@
       border-radius: 12px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.2);
       padding: 12px 16px;
-      max-width: 300px;
+      width: 220px; /* 固定宽度，预留点赞文字位置 */
       z-index: 500;
       pointer-events: auto;
       font-size: 15px;
@@ -351,16 +351,24 @@
       height: 0;
       border-left: 8px solid transparent;
       border-right: 8px solid transparent;
-      border-top: 8px solid #D9D9D9;
+      border-top: 8px solid #efefef;
     }
     
     /* 浮窗图片 */
     .popup-image {
       width: 100%;
-      max-height: 150px;
-      object-fit: cover;
+      height: auto; /* 根据图片比例自动调整高度 */
+      display: block; /* 确保图片是块级元素 */
       border-radius: 8px;
       margin-bottom: 8px;
+    }
+    
+    /* 浮窗文字内容 */
+    #pinPopup > div:not(.popup-footer):not(.popup-buttons) {
+      word-wrap: break-word;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      max-width: 100%;
     }
     
     /* 底部信息栏（时间+点赞） */
@@ -375,7 +383,7 @@
     
     /* 浮窗时间 */
     .popup-time {
-      font-size: 11px;
+      font-size: 9px;
       color: #515157;
       opacity: 0.7;
     }
@@ -702,6 +710,26 @@
       border-left: 3px solid #667eea;
     }
     
+    /* 自己的消息样式 - 绿色 */
+    .chat-message.own-message {
+      background: #1e4a3f;
+      border-left-color: #4ade80;
+    }
+    
+    .chat-message.own-message .chat-message-user {
+      color: #4ade80;
+    }
+    
+    /* 别人的消息样式 - 蓝色 */
+    .chat-message.other-message {
+      background: #1e3a5f;
+      border-left-color: #4a9eff;
+    }
+    
+    .chat-message.other-message .chat-message-user {
+      color: #4a9eff;
+    }
+    
     .chat-message.new-message {
       animation: slideInMessage 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
     }
@@ -731,7 +759,7 @@
     }
     
     .chat-message-time {
-      color: #888;
+      color: #cacaca;
     }
     
     .chat-message-content {
@@ -945,6 +973,7 @@
     let selectedImageFile = null; // 选中的图片文件
     let isEditMode = false; // 是否为编辑模式
     let editingPinKey = null; // 正在编辑的图钉 key
+    let pinSourceFromPS = false; // 标记图钉是否来自 ps 页面
     
     // 获取 DOM 元素
     const backBtn = document.getElementById('backBtn');
@@ -1294,7 +1323,7 @@
     }
     
     // 创建 Firebase 图钉的函数（根据内容切换图标）
-    function createFirebasePin(lngLat, text = '', firebaseKey = null, uid = null, time = null, imageURL = null, likes = {}) {
+    function createFirebasePin(lngLat, text = '', firebaseKey = null, uid = null, time = null, imageURL = null, likes = {}, source = null) {
       // 创建隐藏的 Mapbox 标记用于地理定位
       const el = document.createElement('div');
       el.style.width = '1px';
@@ -1356,10 +1385,16 @@
         uid,
         time,
         imageURL,
+        source,
         likes: likes || {},
         updatePosition,
         updateIcon: () => {
-          svgImg.src = pinData.imageURL ? 'img/pin2-2.svg' : 'img/pin2-1.svg';
+          // 如果来自 ps 页面，使用 pin2-3.svg
+          if (pinData.source === 'album-ps') {
+            svgImg.src = 'img/pin2-3.svg';
+          } else {
+            svgImg.src = pinData.imageURL ? 'img/pin2-2.svg' : 'img/pin2-1.svg';
+          }
         }
       };
 
@@ -1522,7 +1557,7 @@
           const timeDiv = document.createElement('div');
           timeDiv.className = 'popup-time';
           const date = new Date(pinData.time);
-          timeDiv.textContent = '发布于 ' + date.toLocaleString('ja-JP');
+          timeDiv.textContent = date.toLocaleString('ja-JP');
           footerDiv.appendChild(timeDiv);
         } else {
           // 占位元素，保持布局
@@ -1746,7 +1781,11 @@
       // 浮窗显示在图钉上方，偏移 120px（图钉高度 + 更多间距）
       // 只设置 left 和 top，transform 由 CSS 控制（居中和动画）
       pinPopup.style.left = (rect.left + point.x) + 'px';
-      pinPopup.style.top = (rect.top + point.y - 70) + 'px';
+      
+      // 判断是云图钉还是本地图钉，云图钉的气泡位置往下移一点
+      const isFirebasePin = currentPopupPin.firebaseKey !== undefined;
+      const topOffset = isFirebasePin ? -60 : -75; // 云图钉 -50px，本地图钉 -70px
+      pinPopup.style.top = (rect.top + point.y + topOffset) + 'px';
     }
     
     // 监听地图移动更新浮窗位置
@@ -1914,12 +1953,19 @@
             newPinData.imageURL = imageURL;
           }
           
+          // 如果来自 ps 页面，添加 source 标记
+          if (pinSourceFromPS) {
+            newPinData.source = 'album-ps';
+          }
+          
           console.log('💾 保存到数据库:', newPinData);
           await window.firebasePush(pinsRef, newPinData);
           console.log('✅ 图钉已保存到 Firebase');
           
           // 清理
           resetEditor();
+          // 重置来源标记
+          pinSourceFromPS = false;
         }
       } catch (error) {
         console.error('❌ 操作失败:', error);
@@ -1956,6 +2002,7 @@
       pendingPinLocation = null;
       isEditMode = false;
       editingPinKey = null;
+      pinSourceFromPS = false; // 重置来源标记
       
       // 恢复标题
       const title = pinEditor.querySelector('h3');
@@ -1987,6 +2034,9 @@
       
       if (pendingImage && pendingSource === 'album-ps') {
         console.log('检测到来自p图页的图片，自动进入添加图钉模式');
+        
+        // 标记图钉来源为 ps 页面
+        pinSourceFromPS = true;
         
         // 将base64转换为File对象
         const imageFile = dataURLtoFile(pendingImage, 'edited-image-' + Date.now() + '.png');
@@ -2048,7 +2098,8 @@
             data.uid || null, 
             data.time || null, 
             data.imageURL || null,
-            data.likes || {}
+            data.likes || {},
+            data.source || null
           );
           console.log('从 Firebase 加载图钉（map02.svg）:', data.text, lngLat);
         }
@@ -2428,6 +2479,13 @@
         const msgDiv = document.createElement('div');
         msgDiv.className = 'chat-message';
         msgDiv.setAttribute('data-key', messageKey);
+        
+        // 根据是否是当前用户添加不同的样式类
+        if (isCurrentUser) {
+          msgDiv.classList.add('own-message');
+        } else {
+          msgDiv.classList.add('other-message');
+        }
         
         // 如果是新发送的消息，添加动画类
         if (isNewSentMessage) {
