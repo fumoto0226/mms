@@ -691,6 +691,7 @@
       background: #1a1a1a;
       border-top: 2px solid #333;
       overflow-x: hidden;
+      position: relative;
     }
     
     .chat-messages {
@@ -825,6 +826,35 @@
       padding: 8px;
       background: #2d2d2d;
       border-top: 1px solid #333;
+      position: relative;
+    }
+    
+    .chat-emoji-btn,
+    .chat-phrase-btn {
+      padding: 6px 10px;
+      background: #3a3a3a;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+    }
+    
+    .chat-emoji-btn:hover,
+    .chat-phrase-btn:hover {
+      background: #4a4a4a;
+      border-color: #667eea;
+    }
+    
+    .chat-emoji-btn.active,
+    .chat-phrase-btn.active {
+      background: #667eea;
+      border-color: #667eea;
     }
     
     .chat-input {
@@ -860,6 +890,90 @@
     .chat-send-btn:hover {
       transform: translateY(-1px);
       box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+    }
+    
+    /* 表情包选择器 */
+    .emoji-picker {
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      margin-bottom: 4px;
+      background: #2d2d2d;
+      border: 1px solid #444;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+      width: 300px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    
+    .emoji-picker-content {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+      gap: 8px;
+      padding: 12px;
+    }
+    
+    .emoji-item {
+      width: 60px;
+      height: 60px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    
+    .emoji-item:hover {
+      background: #3a3a3a;
+      transform: scale(1.1);
+    }
+    
+    .emoji-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    
+    /* 常用语选择器 */
+    .phrase-picker {
+      position: absolute;
+      bottom: 100%;
+      left: 42px;
+      margin-bottom: 4px;
+      background: #2d2d2d;
+      border: 1px solid #444;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+      width: 300px;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+    
+    .phrase-picker-content {
+      padding: 4px;
+    }
+    
+    .phrase-item {
+      padding: 10px 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s;
+      color: #fff;
+      font-size: 12px;
+      border-bottom: 1px solid #333;
+    }
+    
+    .phrase-item:last-child {
+      border-bottom: none;
+    }
+    
+    .phrase-item:hover {
+      background: #3a3a3a;
     }
     
     /* 功能按钮区域 */
@@ -972,8 +1086,20 @@
       <div class="section-header">聊天</div>
       <div class="chat-messages" id="chatMessages"></div>
       <div class="chat-input-area">
+        <button class="chat-emoji-btn" id="chatEmojiBtn" title="表情包">😊</button>
+        <button class="chat-phrase-btn" id="chatPhraseBtn" title="常用语">💬</button>
         <input type="text" class="chat-input" id="chatInput" placeholder="输入消息..." maxlength="200">
         <button class="chat-send-btn" id="chatSendBtn">发送</button>
+        
+        <!-- 表情包选择器 -->
+        <div class="emoji-picker" id="emojiPicker" style="display: none;">
+          <div class="emoji-picker-content" id="emojiPickerContent"></div>
+        </div>
+        
+        <!-- 常用语选择器 -->
+        <div class="phrase-picker" id="phrasePicker" style="display: none;">
+          <div class="phrase-picker-content" id="phrasePickerContent"></div>
+        </div>
       </div>
     </div>
     
@@ -2889,6 +3015,147 @@
       }, 10000); // 每10秒更新一次（缩短间隔以确保及时更新）
     }
     
+    // 初始化表情包选择器
+    function initEmojiPicker() {
+      const emojiBtn = document.getElementById('chatEmojiBtn');
+      const emojiPicker = document.getElementById('emojiPicker');
+      const emojiPickerContent = document.getElementById('emojiPickerContent');
+      const phrasePicker = document.getElementById('phrasePicker');
+      
+      // 表情包列表（从 img/bq/ 目录加载）
+      const emojiList = [
+        'img/bq/bq01.png'
+      ];
+      
+      // 加载表情包图片
+      emojiList.forEach(emojiPath => {
+        const emojiItem = document.createElement('div');
+        emojiItem.className = 'emoji-item';
+        const img = document.createElement('img');
+        img.src = emojiPath;
+        img.alt = '表情';
+        emojiItem.appendChild(img);
+        
+        emojiItem.addEventListener('click', () => {
+          // 点击表情包直接发送
+          sendEmojiMessage(emojiPath);
+          // 关闭选择器
+          emojiPicker.style.display = 'none';
+          emojiBtn.classList.remove('active');
+        });
+        
+        emojiPickerContent.appendChild(emojiItem);
+      });
+      
+      // 切换表情包选择器显示
+      emojiBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isVisible = emojiPicker.style.display !== 'none';
+        
+        if (isVisible) {
+          emojiPicker.style.display = 'none';
+          emojiBtn.classList.remove('active');
+        } else {
+          emojiPicker.style.display = 'block';
+          emojiBtn.classList.add('active');
+          // 关闭常用语选择器
+          phrasePicker.style.display = 'none';
+          document.getElementById('chatPhraseBtn').classList.remove('active');
+        }
+      });
+      
+      // 点击外部关闭选择器
+      document.addEventListener('click', (e) => {
+        if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
+          emojiPicker.style.display = 'none';
+          emojiBtn.classList.remove('active');
+        }
+      });
+    }
+    
+    // 发送表情包消息
+    function sendEmojiMessage(emojiPath) {
+      if (!currentUID) return;
+      
+      const userIP = document.getElementById('userIP').textContent;
+      const userEmoji = document.getElementById('userEmoji').textContent.trim();
+      
+      const sendTime = Date.now();
+      
+      const chatRef = window.firebaseRef(window.firebaseDatabase, 'chat');
+      window.firebasePush(chatRef, {
+        uid: currentUID,
+        emoji: userEmoji,
+        ip: userIP,
+        message: emojiPath, // 发送图片路径
+        time: sendTime,
+        isImage: true // 标记为图片消息
+      });
+    }
+    
+    // 初始化常用语选择器
+    function initPhrasePicker() {
+      const phraseBtn = document.getElementById('chatPhraseBtn');
+      const phrasePicker = document.getElementById('phrasePicker');
+      const phrasePickerContent = document.getElementById('phrasePickerContent');
+      const chatInput = document.getElementById('chatInput');
+      const emojiPicker = document.getElementById('emojiPicker');
+      
+      // 常用语列表
+      const phrases = [
+        '很高兴认识你,请多多指教。',
+        '谢谢指教,我学到了很多。',
+        '不要走,决战到天亮!',
+        '请认真对待。',
+        '你还在吗?请落子。',
+        '这手棋真是太妙了!',
+        '祝贺你获得胜利。'
+      ];
+      
+      // 加载常用语
+      phrases.forEach(phrase => {
+        const phraseItem = document.createElement('div');
+        phraseItem.className = 'phrase-item';
+        phraseItem.textContent = phrase;
+        
+        phraseItem.addEventListener('click', () => {
+          // 点击常用语后填入输入框
+          chatInput.value = phrase;
+          chatInput.focus();
+          // 关闭选择器
+          phrasePicker.style.display = 'none';
+          phraseBtn.classList.remove('active');
+        });
+        
+        phrasePickerContent.appendChild(phraseItem);
+      });
+      
+      // 切换常用语选择器显示
+      phraseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isVisible = phrasePicker.style.display !== 'none';
+        
+        if (isVisible) {
+          phrasePicker.style.display = 'none';
+          phraseBtn.classList.remove('active');
+        } else {
+          phrasePicker.style.display = 'block';
+          phraseBtn.classList.add('active');
+          // 关闭表情包选择器
+          emojiPicker.style.display = 'none';
+          document.getElementById('chatEmojiBtn').classList.remove('active');
+        }
+      });
+      
+      // 点击外部关闭选择器
+      document.addEventListener('click', (e) => {
+        if (!phrasePicker.contains(e.target) && e.target !== phraseBtn) {
+          phrasePicker.style.display = 'none';
+          phraseBtn.classList.remove('active');
+        }
+      });
+    }
+    
     // 聊天功能
     function initChat() {
       const chatInput = document.getElementById('chatInput');
@@ -2959,12 +3226,33 @@
         const content = document.createElement('div');
         content.className = 'chat-message-content';
         
-        // 创建消息文本容器
-        const messageText = document.createElement('span');
-        messageText.textContent = msgData.message;
-        messageText.style.flex = '1';
-        messageText.style.minWidth = '0'; // 允许文本换行
-        content.appendChild(messageText);
+        // 判断是否是图片消息（表情包）
+        if (msgData.isImage && msgData.message) {
+          // 创建图片容器
+          const imageContainer = document.createElement('div');
+          imageContainer.style.flex = '1';
+          imageContainer.style.display = 'flex';
+          imageContainer.style.alignItems = 'center';
+          imageContainer.style.justifyContent = 'flex-start';
+          
+          const img = document.createElement('img');
+          img.src = msgData.message;
+          img.alt = '表情';
+          img.style.maxWidth = '100px';
+          img.style.maxHeight = '100px';
+          img.style.objectFit = 'contain';
+          img.style.borderRadius = '4px';
+          
+          imageContainer.appendChild(img);
+          content.appendChild(imageContainer);
+        } else {
+          // 创建消息文本容器
+          const messageText = document.createElement('span');
+          messageText.textContent = msgData.message;
+          messageText.style.flex = '1';
+          messageText.style.minWidth = '0'; // 允许文本换行
+          content.appendChild(messageText);
+        }
         
         // 如果是机器人消息且有图钉数据，添加跳转按钮
         if (isBotMessage && msgData.pinKey) {
@@ -3169,6 +3457,10 @@
           sendMessage();
         }
       });
+      
+      // 初始化表情包和常用语功能
+      initEmojiPicker();
+      initPhrasePicker();
       
       // 监听新消息（包括历史消息）
       const chatRef = window.firebaseRef(window.firebaseDatabase, 'chat');
