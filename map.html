@@ -611,18 +611,28 @@
       font-family: 'Courier New', monospace;
     }
     
-    /* 在线用户区域 */
-    .online-users-section {
+    /* 在线用户和聊天区域的容器 */
+    .users-chat-container {
       flex: 1;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      min-height: 0;
+    }
+    
+    /* 在线用户区域 */
+    .online-users-section {
+      flex: 0 0 30%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
       background: #1a1a1a;
+      min-height: 0;
     }
     
     .section-header {
       background: #2d2d2d;
-      padding: 10px 16px;
+      padding: 5px 16px;
       font-size: 13px;
       font-weight: bold;
       color: #fff;
@@ -683,15 +693,55 @@
       font-family: 'Courier New', monospace;
     }
     
+    /* 可拖动分割线 */
+    .resizer {
+      flex: 0 0 4px;
+      background: #333;
+      cursor: row-resize;
+      position: relative;
+      transition: background 0.2s;
+      z-index: 10;
+      border-top: 1px solid #444;
+      border-bottom: 1px solid #444;
+    }
+    
+    .resizer:hover {
+      background: #667eea;
+    }
+    
+    .resizer::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 30px;
+      height: 2px;
+      background: #555;
+      border-radius: 2px;
+    }
+    
+    .resizer:hover::before {
+      background: #fff;
+    }
+    
+    .resizer.dragging {
+      background: #667eea;
+    }
+    
+    .resizer.dragging::before {
+      background: #fff;
+    }
+    
     /* 聊天区域 */
     .chat-section {
+      flex: 1;
       display: flex;
       flex-direction: column;
-      height: 300px;
       background: #1a1a1a;
-      border-top: 2px solid #333;
       overflow-x: hidden;
       position: relative;
+      min-height: 0;
     }
     
     .chat-messages {
@@ -1072,17 +1122,22 @@
       </div>
     </div>
     
-    <!-- 在线用户列表 -->
-    <div class="online-users-section">
-      <div class="section-header">
-        <span>在线用户</span>
-        <span class="online-count" id="onlineCount">0</span>
+    <!-- 在线用户和聊天区域的容器 -->
+    <div class="users-chat-container">
+      <!-- 在线用户列表 -->
+      <div class="online-users-section" id="onlineUsersSection">
+        <div class="section-header">
+          <span>在线用户</span>
+          <span class="online-count" id="onlineCount">0</span>
+        </div>
+        <div class="user-list" id="userList"></div>
       </div>
-      <div class="user-list" id="userList"></div>
-    </div>
-    
-    <!-- 聊天窗口 -->
-    <div class="chat-section">
+      
+      <!-- 可拖动分割线 -->
+      <div class="resizer" id="resizer"></div>
+      
+      <!-- 聊天窗口 -->
+      <div class="chat-section" id="chatSection">
       <div class="section-header">聊天</div>
       <div class="chat-messages" id="chatMessages"></div>
       <div class="chat-input-area">
@@ -1100,6 +1155,7 @@
         <div class="phrase-picker" id="phrasePicker" style="display: none;">
           <div class="phrase-picker-content" id="phrasePickerContent"></div>
         </div>
+      </div>
       </div>
     </div>
     
@@ -3485,6 +3541,76 @@
     }
     
     // 返回初始位置
+    // 初始化可拖动分割线
+    function initResizer() {
+      const resizer = document.getElementById('resizer');
+      const onlineUsersSection = document.getElementById('onlineUsersSection');
+      const chatSection = document.getElementById('chatSection');
+      const container = onlineUsersSection.parentElement;
+      
+      if (!resizer || !onlineUsersSection || !chatSection) return;
+      
+      let isDragging = false;
+      let startY = 0;
+      let startOnlineHeight = 0;
+      let startChatHeight = 0;
+      
+      // 从 localStorage 恢复保存的高度比例
+      const savedRatio = localStorage.getItem('usersChatRatio');
+      if (savedRatio) {
+        const ratio = parseFloat(savedRatio);
+        const containerHeight = container.clientHeight;
+        const onlineHeight = containerHeight * ratio;
+        onlineUsersSection.style.flex = `0 0 ${onlineHeight}px`;
+        chatSection.style.flex = '1 1 0';
+      }
+      
+      resizer.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        startY = e.clientY;
+        startOnlineHeight = onlineUsersSection.offsetHeight;
+        startChatHeight = chatSection.offsetHeight;
+        resizer.classList.add('dragging');
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+      
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        const deltaY = e.clientY - startY;
+        const containerHeight = container.clientHeight;
+        const newOnlineHeight = startOnlineHeight + deltaY;
+        
+        // 限制最小和最大高度
+        const minHeight = 100; // 在线用户列表最小高度
+        const maxHeight = containerHeight - 200; // 聊天窗口最小高度200px
+        
+        if (newOnlineHeight >= minHeight && newOnlineHeight <= maxHeight) {
+          onlineUsersSection.style.flex = `0 0 ${newOnlineHeight}px`;
+          chatSection.style.flex = '1 1 0';
+        }
+        
+        e.preventDefault();
+      });
+      
+      document.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          resizer.classList.remove('dragging');
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          
+          // 保存当前比例到 localStorage
+          const containerHeight = container.clientHeight;
+          const onlineHeight = onlineUsersSection.offsetHeight;
+          const ratio = onlineHeight / containerHeight;
+          localStorage.setItem('usersChatRatio', ratio.toString());
+        }
+      });
+    }
+    
     function initResetPosition() {
       const resetBtn = document.getElementById('resetPositionBtn');
       const initialCenter = [139.7006, 35.6896]; // 新宿站附近
@@ -3506,6 +3632,7 @@
       initOnlineUsers();
       initChat();
       initResetPosition();
+      initResizer();
     });
     
     // 如果Firebase已经准备好，直接初始化
@@ -3515,7 +3642,13 @@
       initOnlineUsers();
       initChat();
       initResetPosition();
+      initResizer();
     }
+    
+    // 页面加载完成后初始化拖动功能（不依赖Firebase）
+    window.addEventListener('DOMContentLoaded', () => {
+      initResizer();
+    });
   </script>
 </body>
 </html>
