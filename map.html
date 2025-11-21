@@ -12,7 +12,7 @@
     // Import the functions you need from the SDKs you need
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-analytics.js";
-    import { getDatabase, ref, push, onChildAdded, onChildRemoved, onChildChanged, remove, update } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js";
+    import { getDatabase, ref, push, onChildAdded, onChildRemoved, onChildChanged, remove, update, onValue, get } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js";
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
     import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-storage.js";
 
@@ -60,6 +60,8 @@
     window.firebaseOnChildChanged = onChildChanged;
     window.firebaseRemove = remove;
     window.firebaseUpdate = update;
+    window.firebaseOnValue = onValue;
+    window.firebaseGet = get;
     window.firebaseStorageRef = storageRef;
     window.firebaseUploadBytes = uploadBytes;
     window.firebaseGetDownloadURL = getDownloadURL;
@@ -2057,23 +2059,49 @@
       }
     }
     
-    // 随机emoji
+    // emoji列表
     const emojis = ['👤', '😀', '😃', '😄', '😁', '😆', '😊', '😎', '🤓', '🧐', '🤗', '🤔', '😇', '🙂', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤩'];
-    let userEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+    
+    // 基于IP地址生成固定的随机emoji（同一个IP总是得到相同的emoji）
+    function getEmojiForIP(ip) {
+      // 简单的哈希函数：将IP地址转换为数字
+      let hash = 0;
+      for (let i = 0; i < ip.length; i++) {
+        const char = ip.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // 转换为32位整数
+      }
+      // 使用哈希值选择emoji，确保结果为正数
+      const index = Math.abs(hash) % emojis.length;
+      return emojis[index];
+    }
     
     // 初始化用户信息
     async function initUserInfo() {
+      // 确保 currentUID 已经设置
+      if (!currentUID) {
+        console.log('等待 currentUID 设置...');
+        setTimeout(initUserInfo, 100);
+        return;
+      }
+      
       const userIP = await getUserIP();
+      const userEmoji = getEmojiForIP(userIP); // 基于IP生成固定emoji
+      
       document.getElementById('userIP').textContent = userIP;
       document.getElementById('userEmoji').textContent = userEmoji;
       
       // 将用户信息保存到Firebase
-      if (currentUID) {
+      if (currentUID && window.firebaseDatabase) {
         const userRef = window.firebaseRef(window.firebaseDatabase, 'users/' + currentUID);
         window.firebaseUpdate(userRef, {
           ip: userIP,
           emoji: userEmoji,
           lastSeen: Date.now()
+        }).then(() => {
+          console.log('用户信息已保存到 Firebase:', currentUID, userIP);
+        }).catch((error) => {
+          console.error('保存用户信息失败:', error);
         });
       }
     }
@@ -2092,6 +2120,10 @@
       const count = Object.keys(onlineUsers).length;
       onlineCount.textContent = count;
       
+      // 获取当前用户的IP和头像
+      const currentUserIP = document.getElementById('userIP').textContent;
+      const currentUserEmoji = document.getElementById('userEmoji').textContent;
+      
       // 添加用户到列表
       Object.entries(onlineUsers).forEach(([uid, userData]) => {
         const item = document.createElement('div');
@@ -2099,11 +2131,19 @@
         
         const emoji = document.createElement('div');
         emoji.className = 'user-emoji';
-        emoji.textContent = userData.emoji || '👤';
+        const userIP = userData.ip || '未知';
+        
+        // 如果IP和当前用户相同，直接使用当前用户显示的头像
+        if (userIP === currentUserIP && currentUserIP !== '获取中...' && currentUserIP !== '未知') {
+          emoji.textContent = currentUserEmoji;
+        } else {
+          // 否则使用Firebase中保存的emoji，或基于IP生成
+          emoji.textContent = userData.emoji || getEmojiForIP(userIP);
+        }
         
         const ip = document.createElement('div');
         ip.className = 'user-ip';
-        ip.textContent = userData.ip || '未知';
+        ip.textContent = userIP;
         
         item.appendChild(emoji);
         item.appendChild(ip);
@@ -2120,12 +2160,42 @@
       
       const usersRef = window.firebaseRef(window.firebaseDatabase, 'users');
       
+      // 首先获取所有已存在的用户
+      window.firebaseGet(usersRef).then((snapshot) => {
+        if (snapshot.exists()) {
+          const allUsers = snapshot.val();
+          console.log('获取到所有用户:', Object.keys(allUsers).length, '个');
+          Object.keys(allUsers).forEach(uid => {
+            if (uid !== currentUID && allUsers[uid]) {
+              // 检查lastSeen，只添加30秒内活跃的用户
+              const now = Date.now();
+              const timeout = 30000; // 30秒
+              if (allUsers[uid].lastSeen && (now - allUsers[uid].lastSeen) <= timeout) {
+                onlineUsers[uid] = allUsers[uid];
+                console.log('添加在线用户:', uid, allUsers[uid].ip);
+              }
+            }
+          });
+          console.log('当前在线用户数:', Object.keys(onlineUsers).length);
+          updateOnlineUsers();
+        } else {
+          console.log('Firebase中没有用户数据');
+        }
+      }).catch((error) => {
+        console.error('获取在线用户失败:', error);
+      });
+      
       // 监听用户加入
       window.firebaseOnChildAdded(usersRef, (snapshot) => {
         const userData = snapshot.val();
         if (userData && snapshot.key !== currentUID) {
-          onlineUsers[snapshot.key] = userData;
-          updateOnlineUsers();
+          // 检查lastSeen，只添加30秒内活跃的用户
+          const now = Date.now();
+          const timeout = 30000; // 30秒
+          if (userData.lastSeen && (now - userData.lastSeen) <= timeout) {
+            onlineUsers[snapshot.key] = userData;
+            updateOnlineUsers();
+          }
         }
       });
       
@@ -2133,8 +2203,19 @@
       window.firebaseOnChildChanged(usersRef, (snapshot) => {
         const userData = snapshot.val();
         if (userData && snapshot.key !== currentUID) {
-          onlineUsers[snapshot.key] = userData;
-          updateOnlineUsers();
+          // 检查lastSeen，只添加30秒内活跃的用户
+          const now = Date.now();
+          const timeout = 30000; // 30秒
+          if (userData.lastSeen && (now - userData.lastSeen) <= timeout) {
+            onlineUsers[snapshot.key] = userData;
+            updateOnlineUsers();
+          } else {
+            // 如果超时，从列表中移除
+            if (onlineUsers[snapshot.key]) {
+              delete onlineUsers[snapshot.key];
+              updateOnlineUsers();
+            }
+          }
         }
       });
       
@@ -2163,11 +2244,31 @@
       
       // 定期更新自己的lastSeen
       setInterval(() => {
-        if (currentUID) {
-          const userRef = window.firebaseRef(window.firebaseDatabase, 'users/' + currentUID + '/lastSeen');
-          window.firebaseUpdate(userRef, Date.now());
+        if (currentUID && window.firebaseDatabase) {
+          const userRef = window.firebaseRef(window.firebaseDatabase, 'users/' + currentUID);
+          const userIP = document.getElementById('userIP').textContent;
+          const userEmoji = document.getElementById('userEmoji').textContent;
+          
+          // 更新lastSeen字段，同时确保ip和emoji也存在
+          const updateData = {
+            lastSeen: Date.now()
+          };
+          
+          // 如果IP和emoji已获取，也一起更新
+          if (userIP && userIP !== '获取中...' && userIP !== '未知') {
+            updateData.ip = userIP;
+          }
+          if (userEmoji) {
+            updateData.emoji = userEmoji;
+          }
+          
+          window.firebaseUpdate(userRef, updateData).then(() => {
+            console.log('心跳更新成功:', currentUID, new Date().toLocaleTimeString());
+          }).catch((error) => {
+            console.error('更新用户心跳失败:', error);
+          });
         }
-      }, 15000); // 每15秒更新一次
+      }, 10000); // 每10秒更新一次（缩短间隔以确保及时更新）
     }
     
     // 聊天功能
@@ -2196,7 +2297,10 @@
         
         const user = document.createElement('span');
         user.className = 'chat-message-user';
-        user.textContent = `${msgData.emoji || '👤'} ${msgData.ip || '未知'}`;
+        // 如果消息中有emoji就使用，否则基于IP生成
+        const msgIP = msgData.ip || '未知';
+        const msgEmoji = msgData.emoji || getEmojiForIP(msgIP);
+        user.textContent = `${msgEmoji} ${msgIP}`;
         
         const time = document.createElement('span');
         time.className = 'chat-message-time';
@@ -2223,11 +2327,14 @@
         const message = chatInput.value.trim();
         if (!message || !currentUID) return;
         
+        const userIP = document.getElementById('userIP').textContent;
+        const userEmoji = getEmojiForIP(userIP); // 基于IP生成固定emoji
+        
         const chatRef = window.firebaseRef(window.firebaseDatabase, 'chat');
         window.firebasePush(chatRef, {
           uid: currentUID,
           emoji: userEmoji,
-          ip: document.getElementById('userIP').textContent,
+          ip: userIP,
           message: message,
           time: Date.now()
         });
