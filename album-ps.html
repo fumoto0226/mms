@@ -1602,7 +1602,29 @@ document.addEventListener('DOMContentLoaded', () => {
   // マップ投稿ボタン
   postBtnEl.onclick = () => {
     if (!postBtnEl.disabled && backgroundImage && postBtnEl.classList.contains('active')) {
-      alert('マップ投稿機能（近日実装予定）');
+      // 将canvas内容转换为图片
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          alert('画像の変換に失敗しました');
+          return;
+        }
+        
+        // 将图片转换为base64并保存到localStorage
+        const reader = new FileReader();
+        reader.onload = () => {
+          const imageData = reader.result;
+          // 保存图片数据到localStorage，标记来自p图页
+          localStorage.setItem('pendingMapPostImage', imageData);
+          localStorage.setItem('pendingMapPostSource', 'album-ps');
+          
+          // 跳转到地图页
+          window.location.href = 'map.html';
+        };
+        reader.onerror = () => {
+          alert('画像の読み込みに失敗しました');
+        };
+        reader.readAsDataURL(blob);
+      }, 'image/png', 1.0);
     }
   };
   postBtnEl.addEventListener('mouseenter', () => {
