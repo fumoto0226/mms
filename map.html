@@ -2634,8 +2634,12 @@
       const currentUserIP = document.getElementById('userIP').textContent;
       const currentUserEmoji = document.getElementById('userEmoji').textContent;
       
-      // 添加用户到列表
-      Object.entries(onlineUsers).forEach(([uid, userData]) => {
+      // 分离当前用户和其他用户
+      const currentUserEntry = currentUID && onlineUsers[currentUID] ? [currentUID, onlineUsers[currentUID]] : null;
+      const otherUsers = Object.entries(onlineUsers).filter(([uid]) => uid !== currentUID);
+      
+      // 创建用户列表项的辅助函数
+      const createUserItem = (uid, userData) => {
         const item = document.createElement('div');
         const isCurrentUser = uid === currentUID;
         item.className = 'user-list-item' + (isCurrentUser ? ' current-user' : '');
@@ -2661,7 +2665,18 @@
         
         item.appendChild(emoji);
         item.appendChild(ip);
-        userList.appendChild(item);
+        return item;
+      };
+      
+      // 先添加当前用户（如果存在）
+      if (currentUserEntry) {
+        const [uid, userData] = currentUserEntry;
+        userList.appendChild(createUserItem(uid, userData));
+      }
+      
+      // 再添加其他用户
+      otherUsers.forEach(([uid, userData]) => {
+        userList.appendChild(createUserItem(uid, userData));
       });
     }
     
