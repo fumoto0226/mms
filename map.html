@@ -521,6 +521,7 @@
       display: flex;
       flex-direction: column;
       box-shadow: -2px 0 8px rgba(0,0,0,0.5);
+      overflow-x: hidden;
     }
     
     /* 用户信息区域 */
@@ -548,6 +549,42 @@
       background: rgba(102, 126, 234, 0.3);
       border-radius: 50%;
       border: 2px solid rgba(102, 126, 234, 0.5);
+      position: relative;
+    }
+    
+    .user-emoji #userEmoji {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+    }
+    
+    .emoji-switch-btn {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      width: auto;
+      height: auto;
+      background: none;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 0;
+      transition: transform 0.2s ease;
+      z-index: 10;
+      box-shadow: none;
+    }
+    
+    .emoji-switch-btn:hover {
+      transform: scale(1.2);
+    }
+    
+    .emoji-switch-btn:active {
+      transform: scale(0.9);
     }
     
     .user-details {
@@ -616,6 +653,15 @@
       background: #2d2d2d;
     }
     
+    .user-list-item.current-user {
+      background: rgba(100, 150, 255, 0.1);
+      border-left: 2px solid #6496ff;
+    }
+    
+    .user-list-item.current-user:hover {
+      background: rgba(100, 150, 255, 0.15);
+    }
+    
     .user-list-item .user-emoji {
       font-size: 20px;
       width: 24px;
@@ -636,11 +682,13 @@
       height: 300px;
       background: #1a1a1a;
       border-top: 2px solid #333;
+      overflow-x: hidden;
     }
     
     .chat-messages {
       flex: 1;
       overflow-y: auto;
+      overflow-x: hidden;
       padding: 8px;
       background: #0d0d0d;
       font-size: 12px;
@@ -652,6 +700,21 @@
       background: #2d2d2d;
       border-radius: 4px;
       border-left: 3px solid #667eea;
+    }
+    
+    .chat-message.new-message {
+      animation: slideInMessage 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    
+    @keyframes slideInMessage {
+      from {
+        transform: translateX(30px) scale(0.95);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0) scale(1);
+        opacity: 1;
+      }
     }
     
     .chat-message-header {
@@ -804,7 +867,10 @@
     <!-- 用户信息 -->
     <div class="user-info">
       <div class="user-info-header">
-        <div class="user-emoji" id="userEmoji">👤</div>
+        <div class="user-emoji" id="userEmojiContainer">
+          <span id="userEmoji">👤</span>
+          <button class="emoji-switch-btn" id="emojiSwitchBtn" title="随机切换头像">🎲</button>
+        </div>
         <div class="user-details">
           <div class="user-name">当前用户</div>
           <div class="user-ip" id="userIP">获取中...</div>
@@ -2076,6 +2142,38 @@
       return emojis[index];
     }
     
+    // 随机切换emoji
+    function switchEmojiRandomly() {
+      const emojiElement = document.getElementById('userEmoji');
+      const currentEmoji = emojiElement.textContent.trim();
+      let newEmoji;
+      
+      // 确保新emoji与当前emoji不同
+      do {
+        const randomIndex = Math.floor(Math.random() * emojis.length);
+        newEmoji = emojis[randomIndex];
+      } while (newEmoji === currentEmoji && emojis.length > 1);
+      
+      // 更新显示
+      emojiElement.textContent = newEmoji;
+      
+      // 更新Firebase
+      if (currentUID && window.firebaseDatabase) {
+        const userRef = window.firebaseRef(window.firebaseDatabase, 'users/' + currentUID);
+        window.firebaseUpdate(userRef, {
+          emoji: newEmoji,
+          lastSeen: Date.now()
+        }).then(() => {
+          console.log('Emoji已更新到 Firebase:', newEmoji);
+        }).catch((error) => {
+          console.error('更新Emoji失败:', error);
+        });
+      }
+      
+      // 更新在线用户列表显示
+      updateOnlineUsers();
+    }
+    
     // 初始化用户信息
     async function initUserInfo() {
       // 确保 currentUID 已经设置
@@ -2086,23 +2184,51 @@
       }
       
       const userIP = await getUserIP();
-      const userEmoji = getEmojiForIP(userIP); // 基于IP生成固定emoji
-      
       document.getElementById('userIP').textContent = userIP;
-      document.getElementById('userEmoji').textContent = userEmoji;
       
-      // 将用户信息保存到Firebase
+      // 先从Firebase读取用户信息，如果存在emoji就使用，否则基于IP生成
+      let userEmoji = getEmojiForIP(userIP); // 默认值
+      
       if (currentUID && window.firebaseDatabase) {
         const userRef = window.firebaseRef(window.firebaseDatabase, 'users/' + currentUID);
+        
+        // 先尝试读取已保存的用户信息
+        try {
+          const snapshot = await window.firebaseGet(userRef);
+          if (snapshot.exists()) {
+            const userData = snapshot.val();
+            // 如果Firebase中有保存的emoji，使用保存的emoji
+            if (userData.emoji) {
+              userEmoji = userData.emoji;
+              console.log('从Firebase读取到已保存的emoji:', userEmoji);
+            }
+          }
+        } catch (error) {
+          console.error('读取用户信息失败:', error);
+        }
+        
+        // 更新显示
+        document.getElementById('userEmoji').textContent = userEmoji;
+        
+        // 将用户信息保存到Firebase（确保IP和emoji都是最新的）
         window.firebaseUpdate(userRef, {
           ip: userIP,
           emoji: userEmoji,
           lastSeen: Date.now()
         }).then(() => {
-          console.log('用户信息已保存到 Firebase:', currentUID, userIP);
+          console.log('用户信息已保存到 Firebase:', currentUID, userIP, userEmoji);
         }).catch((error) => {
           console.error('保存用户信息失败:', error);
         });
+      } else {
+        // 如果Firebase未初始化，直接显示基于IP生成的emoji
+        document.getElementById('userEmoji').textContent = userEmoji;
+      }
+      
+      // 绑定emoji切换按钮事件
+      const switchBtn = document.getElementById('emojiSwitchBtn');
+      if (switchBtn) {
+        switchBtn.addEventListener('click', switchEmojiRandomly);
       }
     }
     
@@ -2127,14 +2253,18 @@
       // 添加用户到列表
       Object.entries(onlineUsers).forEach(([uid, userData]) => {
         const item = document.createElement('div');
-        item.className = 'user-list-item';
+        const isCurrentUser = uid === currentUID;
+        item.className = 'user-list-item' + (isCurrentUser ? ' current-user' : '');
         
         const emoji = document.createElement('div');
         emoji.className = 'user-emoji';
         const userIP = userData.ip || '未知';
         
-        // 如果IP和当前用户相同，直接使用当前用户显示的头像
-        if (userIP === currentUserIP && currentUserIP !== '获取中...' && currentUserIP !== '未知') {
+        // 如果是当前用户，使用当前用户显示的头像
+        if (isCurrentUser) {
+          emoji.textContent = currentUserEmoji;
+        } else if (userIP === currentUserIP && currentUserIP !== '获取中...' && currentUserIP !== '未知') {
+          // 如果IP和当前用户相同（但uid不同），也使用当前用户显示的头像
           emoji.textContent = currentUserEmoji;
         } else {
           // 否则使用Firebase中保存的emoji，或基于IP生成
@@ -2143,7 +2273,7 @@
         
         const ip = document.createElement('div');
         ip.className = 'user-ip';
-        ip.textContent = userIP;
+        ip.textContent = userIP + (isCurrentUser ? ' (我)' : '');
         
         item.appendChild(emoji);
         item.appendChild(ip);
@@ -2166,13 +2296,13 @@
           const allUsers = snapshot.val();
           console.log('获取到所有用户:', Object.keys(allUsers).length, '个');
           Object.keys(allUsers).forEach(uid => {
-            if (uid !== currentUID && allUsers[uid]) {
+            if (allUsers[uid]) {
               // 检查lastSeen，只添加30秒内活跃的用户
               const now = Date.now();
               const timeout = 30000; // 30秒
               if (allUsers[uid].lastSeen && (now - allUsers[uid].lastSeen) <= timeout) {
                 onlineUsers[uid] = allUsers[uid];
-                console.log('添加在线用户:', uid, allUsers[uid].ip);
+                console.log('添加在线用户:', uid, allUsers[uid].ip, uid === currentUID ? '(自己)' : '');
               }
             }
           });
@@ -2188,7 +2318,7 @@
       // 监听用户加入
       window.firebaseOnChildAdded(usersRef, (snapshot) => {
         const userData = snapshot.val();
-        if (userData && snapshot.key !== currentUID) {
+        if (userData) {
           // 检查lastSeen，只添加30秒内活跃的用户
           const now = Date.now();
           const timeout = 30000; // 30秒
@@ -2202,7 +2332,7 @@
       // 监听用户更新
       window.firebaseOnChildChanged(usersRef, (snapshot) => {
         const userData = snapshot.val();
-        if (userData && snapshot.key !== currentUID) {
+        if (userData) {
           // 检查lastSeen，只添加30秒内活跃的用户
           const now = Date.now();
           const timeout = 30000; // 30秒
@@ -2210,8 +2340,8 @@
             onlineUsers[snapshot.key] = userData;
             updateOnlineUsers();
           } else {
-            // 如果超时，从列表中移除
-            if (onlineUsers[snapshot.key]) {
+            // 如果超时，从列表中移除（但如果是自己，不移除）
+            if (snapshot.key !== currentUID && onlineUsers[snapshot.key]) {
               delete onlineUsers[snapshot.key];
               updateOnlineUsers();
             }
@@ -2221,7 +2351,7 @@
       
       // 监听用户离开（节点删除）
       window.firebaseOnChildRemoved(usersRef, (snapshot) => {
-        if (snapshot.key !== currentUID && onlineUsers[snapshot.key]) {
+        if (onlineUsers[snapshot.key]) {
           delete onlineUsers[snapshot.key];
           updateOnlineUsers();
         }
@@ -2280,6 +2410,9 @@
       // 用于跟踪已显示的消息，避免重复显示
       const displayedMessages = new Set();
       
+      // 记录最近发送的消息时间，用于识别新发送的消息
+      let lastSentMessageTime = 0;
+      
       // 添加消息到聊天窗口
       function addMessageToChat(msgData, messageKey) {
         // 检查是否已经显示过
@@ -2288,9 +2421,18 @@
         }
         displayedMessages.add(messageKey);
         
+        // 判断是否是当前用户刚发送的消息
+        const isCurrentUser = msgData.uid === currentUID;
+        const isNewSentMessage = isCurrentUser && msgData.time && msgData.time >= lastSentMessageTime - 1000; // 允许1秒误差
+        
         const msgDiv = document.createElement('div');
         msgDiv.className = 'chat-message';
         msgDiv.setAttribute('data-key', messageKey);
+        
+        // 如果是新发送的消息，添加动画类
+        if (isNewSentMessage) {
+          msgDiv.classList.add('new-message');
+        }
         
         const header = document.createElement('div');
         header.className = 'chat-message-header';
@@ -2318,6 +2460,13 @@
         msgDiv.appendChild(content);
         chatMessages.appendChild(msgDiv);
         
+        // 如果是新消息，在动画结束后移除动画类（保持DOM干净）
+        if (isNewSentMessage) {
+          setTimeout(() => {
+            msgDiv.classList.remove('new-message');
+          }, 400);
+        }
+        
         // 滚动到底部
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
@@ -2328,7 +2477,12 @@
         if (!message || !currentUID) return;
         
         const userIP = document.getElementById('userIP').textContent;
-        const userEmoji = getEmojiForIP(userIP); // 基于IP生成固定emoji
+        // 从DOM中读取当前显示的emoji（这是用户切换后的真实emoji）
+        const userEmoji = document.getElementById('userEmoji').textContent.trim();
+        
+        // 记录发送时间，用于识别新发送的消息
+        const sendTime = Date.now();
+        lastSentMessageTime = sendTime;
         
         const chatRef = window.firebaseRef(window.firebaseDatabase, 'chat');
         window.firebasePush(chatRef, {
@@ -2336,7 +2490,7 @@
           emoji: userEmoji,
           ip: userIP,
           message: message,
-          time: Date.now()
+          time: sendTime
         });
         
         chatInput.value = '';
