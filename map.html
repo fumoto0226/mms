@@ -76,7 +76,7 @@
       position: fixed; 
       top: 0; 
       left: 0; 
-      width: 100%; 
+      width: calc(100% - 320px); 
       height: 100%;
     }
     
@@ -107,35 +107,8 @@
       transform: scale(1.05);
     }
     
-    /* 添加图钉按钮 */
-    #addPinBtn {
-      position: fixed; 
-      bottom: 20px; 
-      right: 20px; 
-      z-index: 1000;
-      background: #007bff; 
-      color: white; 
-      border: none; 
-      border-radius: 50px;
-      padding: 12px 24px; 
-      font-size: 16px; 
-      font-weight: bold; 
-      cursor: pointer; 
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3); 
-      transition: all 0.3s ease;
-      user-select: none;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-    }
-    
-    #addPinBtn:hover {
-      background: #0056b3;
-      transform: scale(1.05);
-    }
-    
+    /* 添加图钉按钮 - 已移到侧边栏，保留样式用于active状态 */
     #addPinBtn.active {
-      background: #28a745;
       animation: pulse 1.5s infinite;
     }
     
@@ -144,11 +117,30 @@
       50% { transform: scale(1.05); }
     }
     
-    /* 图钉 SVG 元素样式 */
+    /* 图钉 SVG 元素样式 （改图钉大小）*/
     .pin-svg {
       position: absolute;
-      width: 48px;
-      height: 48px;
+      width: 50px;
+      height: 50px;
+      cursor: pointer;
+      transition: transform 0.3s ease;
+      transform-origin: bottom center;
+      z-index: 100;
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+    
+    /* Firebase 图钉样式（更小） */
+    .pin-svg-firebase {
+      position: absolute;
+      width: 41px;
+      height: 41px;
       cursor: pointer;
       transition: transform 0.3s ease;
       transform-origin: bottom center;
@@ -164,6 +156,16 @@
     }
     
     .pin-svg img {
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+    
+    .pin-svg-firebase img {
       width: 100%;
       height: 100%;
       pointer-events: none;
@@ -483,12 +485,356 @@
         transform: scale(1);
       }
     }
+    
+    /* 黑色透明遮罩层 */
+    #mapOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: calc(100% - 320px);
+      height: 100%;
+      z-index: 50;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+    
+    #mapOverlay svg {
+      width: 100%;
+      height: 100%;
+    }
+    
+    /* 侧边栏样式 - 深色主题 */
+    #sidebar {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 320px;
+      height: 100%;
+      background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+      border-left: 2px solid #333;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.5);
+    }
+    
+    /* 用户信息区域 */
+    .user-info {
+      background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
+      padding: 16px;
+      color: white;
+      border-bottom: 2px solid #333;
+    }
+    
+    .user-info-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    
+    .user-emoji {
+      font-size: 32px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(102, 126, 234, 0.3);
+      border-radius: 50%;
+      border: 2px solid rgba(102, 126, 234, 0.5);
+    }
+    
+    .user-details {
+      flex: 1;
+    }
+    
+    .user-name {
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    
+    .user-ip {
+      font-size: 11px;
+      opacity: 0.9;
+      font-family: 'Courier New', monospace;
+    }
+    
+    /* 在线用户区域 */
+    .online-users-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #1a1a1a;
+    }
+    
+    .section-header {
+      background: #2d2d2d;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: bold;
+      color: #fff;
+      border-bottom: 1px solid #333;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .online-count {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+    }
+    
+    .user-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    
+    .user-list-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      margin-bottom: 4px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    .user-list-item:hover {
+      background: #2d2d2d;
+    }
+    
+    .user-list-item .user-emoji {
+      font-size: 20px;
+      width: 24px;
+      height: 24px;
+      background: #333;
+    }
+    
+    .user-list-item .user-ip {
+      font-size: 11px;
+      color: #aaa;
+      font-family: 'Courier New', monospace;
+    }
+    
+    /* 聊天区域 */
+    .chat-section {
+      display: flex;
+      flex-direction: column;
+      height: 300px;
+      background: #1a1a1a;
+      border-top: 2px solid #333;
+    }
+    
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      background: #0d0d0d;
+      font-size: 12px;
+    }
+    
+    .chat-message {
+      margin-bottom: 8px;
+      padding: 6px 8px;
+      background: #2d2d2d;
+      border-radius: 4px;
+      border-left: 3px solid #667eea;
+    }
+    
+    .chat-message-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      font-size: 10px;
+      color: #aaa;
+    }
+    
+    .chat-message-user {
+      font-weight: bold;
+      color: #667eea;
+    }
+    
+    .chat-message-time {
+      color: #888;
+    }
+    
+    .chat-message-content {
+      color: #fff;
+      word-wrap: break-word;
+    }
+    
+    .chat-input-area {
+      display: flex;
+      gap: 4px;
+      padding: 8px;
+      background: #2d2d2d;
+      border-top: 1px solid #333;
+    }
+    
+    .chat-input {
+      flex: 1;
+      padding: 6px 10px;
+      border: 1px solid #444;
+      border-radius: 4px;
+      font-size: 12px;
+      resize: none;
+      font-family: inherit;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    
+    .chat-input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    .chat-send-btn {
+      padding: 6px 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: bold;
+      transition: all 0.2s;
+      box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+    }
+    
+    .chat-send-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+    }
+    
+    /* 功能按钮区域 */
+    .action-buttons {
+      padding: 12px;
+      background: #1a1a1a;
+      border-top: 2px solid #333;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .action-btn {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      color: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .action-btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .action-btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+    }
+    
+    .action-btn-primary.active {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      box-shadow: 0 2px 4px rgba(245, 87, 108, 0.3);
+    }
+    
+    .action-btn-primary.active:hover {
+      box-shadow: 0 4px 8px rgba(245, 87, 108, 0.4);
+    }
+    
+    .action-btn-secondary {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+      box-shadow: 0 2px 4px rgba(245, 87, 108, 0.3);
+    }
+    
+    .action-btn-secondary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(245, 87, 108, 0.4);
+    }
+    
+    /* 滚动条样式 - 深色主题 */
+    .user-list::-webkit-scrollbar,
+    .chat-messages::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .user-list::-webkit-scrollbar-track,
+    .chat-messages::-webkit-scrollbar-track {
+      background: #1a1a1a;
+    }
+    
+    .user-list::-webkit-scrollbar-thumb,
+    .chat-messages::-webkit-scrollbar-thumb {
+      background: #444;
+      border-radius: 3px;
+    }
+    
+    .user-list::-webkit-scrollbar-thumb:hover,
+    .chat-messages::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <div id="mapOverlay"></div>
   <button id="backBtn">← 返回</button>
-  <button id="addPinBtn">➕ 添加图钉</button>
+  
+  <!-- 侧边栏 -->
+  <div id="sidebar">
+    <!-- 用户信息 -->
+    <div class="user-info">
+      <div class="user-info-header">
+        <div class="user-emoji" id="userEmoji">👤</div>
+        <div class="user-details">
+          <div class="user-name">当前用户</div>
+          <div class="user-ip" id="userIP">获取中...</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 在线用户列表 -->
+    <div class="online-users-section">
+      <div class="section-header">
+        <span>在线用户</span>
+        <span class="online-count" id="onlineCount">0</span>
+      </div>
+      <div class="user-list" id="userList"></div>
+    </div>
+    
+    <!-- 聊天窗口 -->
+    <div class="chat-section">
+      <div class="section-header">聊天</div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input-area">
+        <input type="text" class="chat-input" id="chatInput" placeholder="输入消息..." maxlength="200">
+        <button class="chat-send-btn" id="chatSendBtn">发送</button>
+      </div>
+    </div>
+    
+    <!-- 功能按钮 -->
+    <div class="action-buttons">
+      <button class="action-btn action-btn-primary" id="addPinBtn">➕ 添加图钉</button>
+      <button class="action-btn action-btn-secondary" id="resetPositionBtn">📍 返回初始位置</button>
+    </div>
+  </div>
   
   <!-- 文字信息输入框 -->
   <div id="pinEditor">
@@ -541,11 +887,138 @@
     const cancelBtn = document.getElementById('cancelBtn');
     const imageInput = document.getElementById('imageInput');
     const imagePreview = document.getElementById('imagePreview');
+    const mapOverlay = document.getElementById('mapOverlay');
+    
+    // 遮罩层相关变量
+    let overlaySVG = null;
+    let overlayDefs = null;
+    let overlayMask = null;
+    let overlayRect = null;
+    const OVERLAY_DISTANCE_METERS = 280; // 本地图钉周围透明区域的半径（米）- 可调整此值来改变照亮范围
+    const FIREBASE_OVERLAY_DISTANCE_METERS = 150; // Firebase图钉周围透明区域的半径（米）
     
     // 返回按钮点击事件
     backBtn.addEventListener('click', () => {
       window.location.href = 'index.html';
     });
+    
+    // 初始化遮罩层
+    function initOverlay() {
+      // 创建 SVG 元素
+      overlaySVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      overlaySVG.setAttribute('width', '100%');
+      overlaySVG.setAttribute('height', '100%');
+      
+      // 创建 defs
+      overlayDefs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+      
+      // 创建模糊滤镜
+      // 增大滤镜范围以避免缩小地图时看到模糊边界
+      // 模糊效果会向外扩展，需要足够大的范围来覆盖
+      const blurFilter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+      blurFilter.setAttribute('id', 'blurFilter');
+      blurFilter.setAttribute('x', '-150%');
+      blurFilter.setAttribute('y', '-150%');
+      blurFilter.setAttribute('width', '400%');
+      blurFilter.setAttribute('height', '400%');
+      
+      const feGaussianBlur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+      feGaussianBlur.setAttribute('in', 'SourceGraphic');
+      feGaussianBlur.setAttribute('stdDeviation', '25'); // 模糊程度，可以调整此值来改变边缘模糊度（数值越大越模糊）
+      
+      blurFilter.appendChild(feGaussianBlur);
+      overlayDefs.appendChild(blurFilter);
+      
+      // 创建 mask（在 mask 中，黑色表示透明，白色表示不透明）
+      overlayMask = document.createElementNS('http://www.w3.org/2000/svg', 'mask');
+      overlayMask.setAttribute('id', 'pinMask');
+      
+      // 创建白色背景（在 mask 中，白色表示不透明，即显示遮罩）
+      const maskRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      maskRect.setAttribute('width', '100%');
+      maskRect.setAttribute('height', '100%');
+      maskRect.setAttribute('fill', 'white'); // 白色 = 不透明（显示遮罩）
+      overlayMask.appendChild(maskRect);
+      
+      overlayDefs.appendChild(overlayMask);
+      overlaySVG.appendChild(overlayDefs);
+      
+      // 创建遮罩层矩形（使用 mask）
+      overlayRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      overlayRect.setAttribute('width', '100%');
+      overlayRect.setAttribute('height', '100%');
+      overlayRect.setAttribute('fill', 'rgba(0, 0, 0, 0.6)'); // 黑色半透明
+      overlayRect.setAttribute('mask', 'url(#pinMask)');
+      overlaySVG.appendChild(overlayRect);
+      
+      mapOverlay.appendChild(overlaySVG);
+    }
+    
+    // 计算指定距离（米）对应的像素半径
+    function calculatePixelRadius(lngLat, distanceMeters) {
+      // 使用地图中心点的纬度来计算
+      const lat = lngLat[1];
+      
+      // 计算经度方向上的偏移（米转度）
+      // 1度经度在不同纬度的距离不同，这里使用近似值
+      const metersPerDegreeLng = 111320 * Math.cos(lat * Math.PI / 180);
+      const degreesLng = distanceMeters / metersPerDegreeLng;
+      
+      // 计算纬度方向上的偏移（米转度）
+      const metersPerDegreeLat = 111320;
+      const degreesLat = distanceMeters / metersPerDegreeLat;
+      
+      // 计算图钉位置和偏移位置的像素坐标
+      const centerPoint = map.project(lngLat);
+      const offsetPoint = map.project([lngLat[0] + degreesLng, lngLat[1]]);
+      
+      // 计算像素距离
+      const pixelRadius = Math.abs(offsetPoint.x - centerPoint.x);
+      
+      return pixelRadius;
+    }
+    
+    // 更新遮罩层
+    function updateOverlay() {
+      if (!overlayMask) return;
+      
+      // 清除所有现有的圆形（除了白色背景矩形）
+      const existingCircles = overlayMask.querySelectorAll('circle');
+      existingCircles.forEach(circle => circle.remove());
+      
+      // 获取所有图钉（本地图钉 + Firebase图钉）
+      const allPins = [...pins, ...firebasePins];
+      
+      // 为每个图钉创建圆形透明区域（带模糊边缘）
+      allPins.forEach(pin => {
+        if (!pin.lngLat) return;
+        
+        // 判断是本地图钉还是 Firebase 图钉，使用不同的照亮范围
+        const isFirebasePin = pin.firebaseKey !== undefined;
+        const distanceMeters = isFirebasePin ? FIREBASE_OVERLAY_DISTANCE_METERS : OVERLAY_DISTANCE_METERS;
+        
+        // 计算像素半径
+        const pixelRadius = calculatePixelRadius(pin.lngLat, distanceMeters);
+        
+        // 获取图钉的像素坐标（相对于地图容器）
+        // 由于遮罩层和地图容器都是 fixed 定位且覆盖整个屏幕，坐标可以直接使用
+        const point = map.project(pin.lngLat);
+        
+        // 创建一个 group 来包含模糊的圆形
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        group.setAttribute('filter', 'url(#blurFilter)'); // 应用模糊效果到圆形边缘
+        
+        // 创建黑色圆形（在 mask 中，黑色表示透明，即图钉周围不显示遮罩）
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', point.x);
+        circle.setAttribute('cy', point.y);
+        circle.setAttribute('r', pixelRadius);
+        circle.setAttribute('fill', 'black'); // 黑色 = 透明（图钉周围不显示遮罩）
+        
+        group.appendChild(circle);
+        overlayMask.appendChild(group);
+      });
+    }
     
     // 等待 Firebase 认证完成
     window.addEventListener('firebaseAuthReady', () => {
@@ -745,6 +1218,10 @@
       });
       
       pins.push(pinData);
+      
+      // 更新遮罩层
+      updateOverlay();
+      
       return pinData;
     }
     
@@ -764,9 +1241,9 @@
         .setLngLat(lngLat)
         .addTo(map);
 
-      // 创建 SVG 图钉元素（发布内容使用专用图标）
+      // 创建 SVG 图钉元素（发布内容使用专用图标，使用更小的尺寸）
       const svgElement = document.createElement('div');
-      svgElement.className = 'pin-svg';
+      svgElement.className = 'pin-svg-firebase'; // 使用更小的样式类
       
       const svgImg = document.createElement('img');
       svgElement.appendChild(svgImg);
@@ -774,14 +1251,14 @@
       // 添加到页面
       document.body.appendChild(svgElement);
 
-      // 更新图钉位置的函数
+      // 更新图钉位置的函数（使用更小的偏移值）
       function updatePosition() {
         const point = map.project(lngLat);
         const container = map.getContainer();
         const rect = container.getBoundingClientRect();
         
-        svgElement.style.left = (rect.left + point.x - 24) + 'px';
-        svgElement.style.top = (rect.top + point.y - 48) + 'px';
+        svgElement.style.left = (rect.left + point.x - 18) + 'px'; // 18px 是 36px 宽度的一半
+        svgElement.style.top = (rect.top + point.y - 36) + 'px'; // 36px 是高度，锚点在底部
       }
 
       // 监听地图事件更新位置
@@ -936,6 +1413,10 @@
       });
       
       firebasePins.push(pinData);
+      
+      // 更新遮罩层
+      updateOverlay();
+      
       return pinData;
     }
     
@@ -1201,8 +1682,17 @@
     }
     
     // 监听地图移动更新浮窗位置
-    map.on('move', updatePopupPosition);
-    map.on('zoom', updatePopupPosition);
+    map.on('move', () => {
+      updatePopupPosition();
+      updateOverlay();
+    });
+    map.on('zoom', () => {
+      updatePopupPosition();
+      updateOverlay();
+    });
+    map.on('resize', () => {
+      updateOverlay();
+    });
     
     // 浮窗鼠标事件 - 防止鼠标移到浮窗上时消失
     pinPopup.addEventListener('mouseenter', () => {
@@ -1457,6 +1947,9 @@
 
     // 地图加载完成后，初始化本地图钉和 Firebase 监听
     map.on('load', () => {
+      // 初始化遮罩层
+      initOverlay();
+      
       // 检查是否有待发布的图片
       checkPendingMapPost();
       
@@ -1464,6 +1957,9 @@
       const shinjukuStation = [139.7006, 35.6896];
       createLocalPin(shinjukuStation, '新宿站');
       console.log('已在新宿站添加本地测试图钉（pin1-1.svg）');
+      
+      // 初始化遮罩层
+      updateOverlay();
       
       // 初始化 Firebase 监听器（使用 map02.svg）
       const pinsRef = window.firebaseRef(window.firebaseDatabase, 'pins');
@@ -1513,6 +2009,9 @@
           // 从数组中移除
           firebasePins.splice(pinIndex, 1);
           console.log('已删除 Firebase 图钉:', key);
+          
+          // 更新遮罩层
+          updateOverlay();
         }
       });
       
@@ -1543,6 +2042,260 @@
       
       console.log('Firebase 监听器已初始化');
     });
+    
+    // ========== 侧边栏功能 ==========
+    
+    // 获取用户IP地址
+    async function getUserIP() {
+      try {
+        const response = await fetch('https://api.ipify.org?format=json');
+        const data = await response.json();
+        return data.ip;
+      } catch (error) {
+        console.error('获取IP失败:', error);
+        return '127.0.0.1';
+      }
+    }
+    
+    // 随机emoji
+    const emojis = ['👤', '😀', '😃', '😄', '😁', '😆', '😊', '😎', '🤓', '🧐', '🤗', '🤔', '😇', '🙂', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤩'];
+    let userEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+    
+    // 初始化用户信息
+    async function initUserInfo() {
+      const userIP = await getUserIP();
+      document.getElementById('userIP').textContent = userIP;
+      document.getElementById('userEmoji').textContent = userEmoji;
+      
+      // 将用户信息保存到Firebase
+      if (currentUID) {
+        const userRef = window.firebaseRef(window.firebaseDatabase, 'users/' + currentUID);
+        window.firebaseUpdate(userRef, {
+          ip: userIP,
+          emoji: userEmoji,
+          lastSeen: Date.now()
+        });
+      }
+    }
+    
+    // 在线用户管理
+    let onlineUsers = {};
+    
+    function updateOnlineUsers() {
+      const userList = document.getElementById('userList');
+      const onlineCount = document.getElementById('onlineCount');
+      
+      // 清空列表
+      userList.innerHTML = '';
+      
+      // 更新在线人数
+      const count = Object.keys(onlineUsers).length;
+      onlineCount.textContent = count;
+      
+      // 添加用户到列表
+      Object.entries(onlineUsers).forEach(([uid, userData]) => {
+        const item = document.createElement('div');
+        item.className = 'user-list-item';
+        
+        const emoji = document.createElement('div');
+        emoji.className = 'user-emoji';
+        emoji.textContent = userData.emoji || '👤';
+        
+        const ip = document.createElement('div');
+        ip.className = 'user-ip';
+        ip.textContent = userData.ip || '未知';
+        
+        item.appendChild(emoji);
+        item.appendChild(ip);
+        userList.appendChild(item);
+      });
+    }
+    
+    // 监听在线用户变化
+    function initOnlineUsers() {
+      if (!window.firebaseDatabase || !currentUID) {
+        setTimeout(initOnlineUsers, 100);
+        return;
+      }
+      
+      const usersRef = window.firebaseRef(window.firebaseDatabase, 'users');
+      
+      // 监听用户加入
+      window.firebaseOnChildAdded(usersRef, (snapshot) => {
+        const userData = snapshot.val();
+        if (userData && snapshot.key !== currentUID) {
+          onlineUsers[snapshot.key] = userData;
+          updateOnlineUsers();
+        }
+      });
+      
+      // 监听用户更新
+      window.firebaseOnChildChanged(usersRef, (snapshot) => {
+        const userData = snapshot.val();
+        if (userData && snapshot.key !== currentUID) {
+          onlineUsers[snapshot.key] = userData;
+          updateOnlineUsers();
+        }
+      });
+      
+      // 监听用户离开（节点删除）
+      window.firebaseOnChildRemoved(usersRef, (snapshot) => {
+        if (snapshot.key !== currentUID && onlineUsers[snapshot.key]) {
+          delete onlineUsers[snapshot.key];
+          updateOnlineUsers();
+        }
+      });
+      
+      // 监听用户离开（通过定期检查lastSeen，作为备用机制）
+      setInterval(() => {
+        const now = Date.now();
+        const timeout = 30000; // 30秒未更新视为离线
+        
+        Object.keys(onlineUsers).forEach(uid => {
+          if (uid !== currentUID && onlineUsers[uid].lastSeen) {
+            if (now - onlineUsers[uid].lastSeen > timeout) {
+              delete onlineUsers[uid];
+              updateOnlineUsers();
+            }
+          }
+        });
+      }, 10000); // 每10秒检查一次
+      
+      // 定期更新自己的lastSeen
+      setInterval(() => {
+        if (currentUID) {
+          const userRef = window.firebaseRef(window.firebaseDatabase, 'users/' + currentUID + '/lastSeen');
+          window.firebaseUpdate(userRef, Date.now());
+        }
+      }, 15000); // 每15秒更新一次
+    }
+    
+    // 聊天功能
+    function initChat() {
+      const chatInput = document.getElementById('chatInput');
+      const chatSendBtn = document.getElementById('chatSendBtn');
+      const chatMessages = document.getElementById('chatMessages');
+      
+      // 用于跟踪已显示的消息，避免重复显示
+      const displayedMessages = new Set();
+      
+      // 添加消息到聊天窗口
+      function addMessageToChat(msgData, messageKey) {
+        // 检查是否已经显示过
+        if (displayedMessages.has(messageKey)) {
+          return;
+        }
+        displayedMessages.add(messageKey);
+        
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'chat-message';
+        msgDiv.setAttribute('data-key', messageKey);
+        
+        const header = document.createElement('div');
+        header.className = 'chat-message-header';
+        
+        const user = document.createElement('span');
+        user.className = 'chat-message-user';
+        user.textContent = `${msgData.emoji || '👤'} ${msgData.ip || '未知'}`;
+        
+        const time = document.createElement('span');
+        time.className = 'chat-message-time';
+        const date = new Date(msgData.time);
+        time.textContent = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        
+        header.appendChild(user);
+        header.appendChild(time);
+        
+        const content = document.createElement('div');
+        content.className = 'chat-message-content';
+        content.textContent = msgData.message;
+        
+        msgDiv.appendChild(header);
+        msgDiv.appendChild(content);
+        chatMessages.appendChild(msgDiv);
+        
+        // 滚动到底部
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+      
+      // 发送消息
+      function sendMessage() {
+        const message = chatInput.value.trim();
+        if (!message || !currentUID) return;
+        
+        const chatRef = window.firebaseRef(window.firebaseDatabase, 'chat');
+        window.firebasePush(chatRef, {
+          uid: currentUID,
+          emoji: userEmoji,
+          ip: document.getElementById('userIP').textContent,
+          message: message,
+          time: Date.now()
+        });
+        
+        chatInput.value = '';
+      }
+      
+      chatSendBtn.addEventListener('click', sendMessage);
+      chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          sendMessage();
+        }
+      });
+      
+      // 监听新消息（包括历史消息）
+      const chatRef = window.firebaseRef(window.firebaseDatabase, 'chat');
+      window.firebaseOnChildAdded(chatRef, (snapshot) => {
+        const msgData = snapshot.val();
+        if (!msgData) return;
+        
+        addMessageToChat(msgData, snapshot.key);
+      });
+      
+      // 监听消息删除
+      window.firebaseOnChildRemoved(chatRef, (snapshot) => {
+        const messageKey = snapshot.key;
+        displayedMessages.delete(messageKey);
+        
+        // 从DOM中移除
+        const msgElement = chatMessages.querySelector(`[data-key="${messageKey}"]`);
+        if (msgElement) {
+          msgElement.remove();
+        }
+      });
+    }
+    
+    // 返回初始位置
+    function initResetPosition() {
+      const resetBtn = document.getElementById('resetPositionBtn');
+      const initialCenter = [139.7006, 35.6896]; // 新宿站附近
+      const initialZoom = 14.1;
+      
+      resetBtn.addEventListener('click', () => {
+        map.flyTo({
+          center: initialCenter,
+          zoom: initialZoom,
+          duration: 1500
+        });
+      });
+    }
+    
+    // 初始化所有侧边栏功能
+    window.addEventListener('firebaseAuthReady', () => {
+      currentUID = window.currentUID;
+      initUserInfo();
+      initOnlineUsers();
+      initChat();
+      initResetPosition();
+    });
+    
+    // 如果Firebase已经准备好，直接初始化
+    if (window.currentUID) {
+      currentUID = window.currentUID;
+      initUserInfo();
+      initOnlineUsers();
+      initChat();
+      initResetPosition();
+    }
   </script>
 </body>
 </html>
