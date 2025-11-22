@@ -109,6 +109,35 @@
       transform: scale(1.05);
     }
     
+    /* 顶部提示 */
+    #mapTip {
+      position: fixed;
+      top: 18px;
+      left: 150px;
+      transform: none;
+      z-index: 1000;
+      padding: 12px 28px;
+      border-radius: 999px;
+      background: rgba(15, 20, 30, 0.26);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #f5f5f7;
+      font-size: 15px;
+      font-weight: 600;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+    }
+    
+    #mapTip::before {
+      content: "✨";
+      font-size: 16px;
+    }
+    
     /* 添加图钉按钮 - 已移到侧边栏，保留样式用于active状态 */
     #addPinBtn.active {
       animation: pulse 1.5s infinite;
@@ -175,6 +204,59 @@
       -webkit-user-select: none;
       -moz-user-select: none;
       -ms-user-select: none;
+    }
+    
+    body.adding-pin-mode .pin-svg,
+    body.adding-pin-mode .pin-svg-firebase {
+      opacity: 0.2;
+      filter: grayscale(1);
+      transform: scale(0.9);
+      pointer-events: none;
+    }
+    
+    #addPinCrosshair {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 1500;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    
+    #addPinCrosshair.show {
+      opacity: 1;
+    }
+    /* 十字线提示 */
+    #addPinCrosshair .crosshair-line {
+      position: absolute;
+      background: rgba(20, 207, 58, 0.8);
+      box-shadow: 0 0 12px rgba(136, 255, 193, 0.6);
+    }
+    
+    #addPinCrosshair .crosshair-line.horizontal {
+      height: 1.5px;
+      width: 100%;
+      left: 0;
+    }
+    
+    #addPinCrosshair .crosshair-line.vertical {
+      width: 1.5px;
+      height: 100%;
+      top: 0;
+    }
+    
+    #addPinCrosshair .crosshair-center {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid rgba(20, 207, 58, 0.8);
+      box-shadow: 0 0 10px rgba(136, 255, 193, 0.6);
+      background: rgba(80, 180, 255, 0.15);
+      transform: translate(-50%, -50%);
     }
     
     /* 隐藏 Mapbox 默认标记 */
@@ -333,6 +415,12 @@
       transition: opacity 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), 
                   transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
+
+    #pinPopup.ps-pin {
+      background: linear-gradient(180deg, #ffffff 0%, #8afbff 20%, #e4ffab 64%, #ffffff 100%);
+      box-shadow: 0 12px 30px rgba(60, 116, 150, 0.35);
+      color: #3a3a3a;
+    }
     
     #pinPopup.show {
       opacity: 1;
@@ -352,6 +440,20 @@
       border-left: 8px solid transparent;
       border-right: 8px solid transparent;
       border-top: 8px solid #efefef;
+    }
+
+    #pinPopup.ps-pin::after {
+      bottom: -8px;
+      width: 0;
+      height: 0;
+      border: none;
+      background: none;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-top: 8px solid #ffffff;
+      border-radius: 0;
+      transform: translateX(-50%);
+      box-shadow: 0 6px 12px rgba(60, 116, 150, 0.2);
     }
     
     /* 浮窗图片 */
@@ -396,6 +498,34 @@
       cursor: pointer;
       user-select: none;
       transition: all 0.2s ease;
+    }
+
+    .pin-source-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #1f6d8f;
+      background: rgba(255, 255, 255, 0.55);
+      border-radius: 999px;
+      padding: 4px 10px;
+      margin-bottom: 10px;
+      box-shadow: inset 0 0 0 1px rgba(31, 109, 143, 0.1);
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    
+    .pin-source-badge:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(31, 109, 143, 0.35), inset 0 0 0 1px rgba(31, 109, 143, 0.2);
+    }
+    
+    .pin-source-badge:hover {
+      transform: translateY(-1px);
+      box-shadow: inset 0 0 0 1px rgba(31, 109, 143, 0.25), 0 3px 6px rgba(31, 109, 143, 0.15);
     }
     
     .popup-like:hover {
@@ -546,6 +676,33 @@
       gap: 12px;
       margin-bottom: 8px;
     }
+
+    .user-favor {
+      margin-left: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+      text-align: right;
+    }
+
+    .user-favor-label {
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: rgba(255, 255, 255, 0.65);
+    }
+
+    .user-favor-value {
+      min-width: 64px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.05);
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+    }
     
     .user-emoji {
       font-size: 32px;
@@ -670,6 +827,10 @@
     .user-list-item:hover {
       background: #2d2d2d;
     }
+
+    .user-list-item .user-ip {
+      flex: 1;
+    }
     
     .user-list-item.current-user {
       background: rgba(100, 150, 255, 0.1);
@@ -691,6 +852,19 @@
       font-size: 11px;
       color: #aaa;
       font-family: 'Courier New', monospace;
+    }
+
+    .favor-badge {
+      margin-left: auto;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(100, 150, 255, 0.15);
+      border: 1px solid rgba(100, 150, 255, 0.3);
+      font-size: 12px;
+      font-weight: 600;
+      color: #dbe7ff;
+      min-width: 42px;
+      text-align: center;
     }
     
     /* 可拖动分割线 */
@@ -1105,6 +1279,9 @@
   <div id="map"></div>
   <div id="mapOverlay"></div>
   <button id="backBtn">← 返回</button>
+  <div id="mapTip" role="status" aria-live="polite">
+    添加图钉点亮地图，为 mm 星人提供情报获取好感值
+  </div>
   
   <!-- 侧边栏 -->
   <div id="sidebar">
@@ -1119,6 +1296,10 @@
           <div class="user-name">当前用户</div>
           <div class="user-ip" id="userIP">获取中...</div>
         </div>
+          <div class="user-favor" aria-live="polite">
+            <span class="user-favor-label">好感值</span>
+            <span class="user-favor-value" id="userFavorValue">0</span>
+          </div>
       </div>
     </div>
     
@@ -1195,8 +1376,11 @@
       container: "map",
       style: "mapbox://styles/fumoto/cmhmpsu1v000u01sr4tny40mj",
       center: [139.7006, 35.6896], // 新宿站附近
-      zoom: 14.1
+      zoom: 14.1,
+      pitchWithRotate: false,
+      dragRotate: false
     });
+    map.touchZoomRotate.disableRotation();
 
     // 存储所有图钉
     const pins = [];
@@ -1350,6 +1534,18 @@
         overlayMask.appendChild(group);
       });
     }
+
+    // 更新图钉的层级顺序，使南方图钉显示在北方图钉上方
+    function updatePinLayerOrder() {
+      const allPins = [...pins, ...firebasePins].filter(pin => pin && pin.lngLat && pin.svgElement);
+      if (allPins.length === 0) return;
+      
+      allPins
+        .sort((a, b) => b.lngLat[1] - a.lngLat[1]) // 纬度高（北方）的排在前面
+        .forEach((pin, index) => {
+          pin.svgElement.style.zIndex = String(200 + index);
+        });
+    }
     
     // 等待 Firebase 认证完成
     window.addEventListener('firebaseAuthReady', () => {
@@ -1371,8 +1567,8 @@
       }
     });
     
-    // 创建本地图钉的函数（使用 pin1-1.svg）
-    function createLocalPin(lngLat, text = '') {
+    // 创建本地图钉的函数（默认使用 pin1-1.svg，可自定义）
+    function createLocalPin(lngLat, text = '', iconURL = 'img/pin1-1.svg') {
       // 创建隐藏的 Mapbox 标记用于地理定位
       const el = document.createElement('div');
       el.style.width = '1px';
@@ -1392,7 +1588,7 @@
       svgElement.className = 'pin-svg';
       
       const svgImg = document.createElement('img');
-      svgImg.src = 'img/pin1-1.svg';
+      svgImg.src = iconURL;
       svgElement.appendChild(svgImg);
       
       // 添加到页面
@@ -1493,10 +1689,18 @@
         
         // 动画完成后恢复图钉大小
         setTimeout(() => {
-          if (svgElement.getAttribute('_hover') === '1') {
+          // 检查鼠标是否仍在图钉上
+          const rect = svgElement.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          const elementAtPoint = document.elementFromPoint(centerX, centerY);
+          const isMouseOver = elementAtPoint === svgElement || svgElement.contains(elementAtPoint);
+          
+          if (isMouseOver && svgElement.getAttribute('_hover') === '1') {
             svgElement.style.transform = 'scale(1.3)';
           } else {
             svgElement.style.transform = 'scale(1)';
+            svgElement.setAttribute('_hover', '0');
           }
         }, duration);
       });
@@ -1515,8 +1719,10 @@
         }
       });
       
-      svgElement.addEventListener('mouseleave', () => {
+      svgElement.addEventListener('mouseleave', (e) => {
+        // 确保状态被正确清除
         svgElement.setAttribute('_hover', '0');
+        svgElement.setAttribute('_active', '0');
         if (svgElement.getAttribute('_active') !== '1') {
           svgElement.style.transition = 'transform 0.3s ease';
           svgElement.style.transform = 'scale(1)';
@@ -1538,17 +1744,23 @@
         svgElement.style.transform = 'scale(0.92)';
       });
       
-      svgElement.addEventListener('mouseup', () => {
+      svgElement.addEventListener('mouseup', (e) => {
         svgElement.setAttribute('_active', '0');
         svgElement.style.transition = 'transform 0.3s ease';
-        if (svgElement.getAttribute('_hover') === '1') {
+        // 检查鼠标是否仍在图钉上
+        const rect = svgElement.getBoundingClientRect();
+        const isMouseOver = e.clientX >= rect.left && e.clientX <= rect.right &&
+                           e.clientY >= rect.top && e.clientY <= rect.bottom;
+        if (isMouseOver && svgElement.getAttribute('_hover') === '1') {
           svgElement.style.transform = 'scale(1.3)';
         } else {
           svgElement.style.transform = 'scale(1)';
+          svgElement.setAttribute('_hover', '0');
         }
       });
       
-      pins.push(pinData);
+    pins.push(pinData);
+    updatePinLayerOrder();
       
       // 更新遮罩层
       updateOverlay();
@@ -1695,10 +1907,18 @@
         
         // 动画完成后恢复图钉大小
         setTimeout(() => {
-          if (svgElement.getAttribute('_hover') === '1') {
+          // 检查鼠标是否仍在图钉上
+          const rect = svgElement.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          const elementAtPoint = document.elementFromPoint(centerX, centerY);
+          const isMouseOver = elementAtPoint === svgElement || svgElement.contains(elementAtPoint);
+          
+          if (isMouseOver && svgElement.getAttribute('_hover') === '1') {
             svgElement.style.transform = 'scale(1.3)';
           } else {
             svgElement.style.transform = 'scale(1)';
+            svgElement.setAttribute('_hover', '0');
           }
         }, duration);
       });
@@ -1717,8 +1937,10 @@
         }
       });
       
-      svgElement.addEventListener('mouseleave', () => {
+      svgElement.addEventListener('mouseleave', (e) => {
+        // 确保状态被正确清除
         svgElement.setAttribute('_hover', '0');
+        svgElement.setAttribute('_active', '0');
         if (svgElement.getAttribute('_active') !== '1') {
           svgElement.style.transition = 'transform 0.3s ease';
           svgElement.style.transform = 'scale(1)';
@@ -1740,17 +1962,23 @@
         svgElement.style.transform = 'scale(0.92)';
       });
       
-      svgElement.addEventListener('mouseup', () => {
+      svgElement.addEventListener('mouseup', (e) => {
         svgElement.setAttribute('_active', '0');
         svgElement.style.transition = 'transform 0.3s ease';
-        if (svgElement.getAttribute('_hover') === '1') {
+        // 检查鼠标是否仍在图钉上
+        const rect = svgElement.getBoundingClientRect();
+        const isMouseOver = e.clientX >= rect.left && e.clientX <= rect.right &&
+                           e.clientY >= rect.top && e.clientY <= rect.bottom;
+        if (isMouseOver && svgElement.getAttribute('_hover') === '1') {
           svgElement.style.transform = 'scale(1.3)';
         } else {
           svgElement.style.transform = 'scale(1)';
+          svgElement.setAttribute('_hover', '0');
         }
       });
       
-      firebasePins.push(pinData);
+    firebasePins.push(pinData);
+    updatePinLayerOrder();
       
       // 更新遮罩层
       updateOverlay();
@@ -1802,9 +2030,29 @@
       if (!pinData.text && !pinData.imageURL) return; // 如果没有文字和图片则不显示
       
       currentPopupPin = pinData;
+      const isAlbumPin = pinData.source === 'album-ps';
+      pinPopup.classList.toggle('ps-pin', isAlbumPin);
       
       // 清空浮窗内容
       pinPopup.innerHTML = '';
+
+      if (isAlbumPin) {
+        const badge = document.createElement('button');
+        badge.className = 'pin-source-badge';
+        badge.type = 'button';
+        badge.textContent = '此 pin 通过本站 Album 发布 ✨';
+        badge.addEventListener('click', (event) => {
+          event.stopPropagation();
+          window.open('album-ps.html', '_blank');
+        });
+        badge.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            badge.click();
+          }
+        });
+        pinPopup.appendChild(badge);
+      }
       
       // 添加图片（如果有）
       if (pinData.imageURL) {
@@ -1921,10 +2169,28 @@
       });
     }
     
+    // 重置所有图钉的 hover 和 active 状态
+    function resetAllPinsState() {
+      const allPins = [...pins, ...firebasePins].filter(pin => pin && pin.svgElement);
+      allPins.forEach(pin => {
+        if (pin.svgElement) {
+          pin.svgElement.setAttribute('_hover', '0');
+          pin.svgElement.setAttribute('_active', '0');
+          pin.svgElement.style.transition = 'transform 0.3s ease';
+          pin.svgElement.style.transform = 'scale(1)';
+        }
+      });
+    }
+    
     // 隐藏图钉文字浮窗
     function hidePopup() {
       pinPopup.classList.remove('show');
+      pinPopup.setAttribute('_hovering', '0');
+      // 清空浮窗内容，避免残留的事件监听器
+      pinPopup.innerHTML = '';
       currentPopupPin = null;
+      // 重置所有图钉的状态，避免卡住
+      resetAllPinsState();
     }
     
     // 编辑图钉
@@ -2095,19 +2361,89 @@
     let isAddingPin = false;
     let pendingPinLocation = null; // 待添加图钉的位置
     const addBtn = document.getElementById("addPinBtn");
-
-    addBtn.addEventListener("click", () => {
-      isAddingPin = !isAddingPin;
-      
-      if (isAddingPin) {
+    const mapContainer = map.getContainer();
+    
+    // 添加图钉模式下的十字线提示
+    const crosshairOverlay = document.createElement('div');
+    crosshairOverlay.id = 'addPinCrosshair';
+    crosshairOverlay.innerHTML = `
+      <div class="crosshair-line horizontal"></div>
+      <div class="crosshair-line vertical"></div>
+      <div class="crosshair-center"></div>
+    `;
+    document.body.appendChild(crosshairOverlay);
+    const crosshairHorizontal = crosshairOverlay.querySelector('.crosshair-line.horizontal');
+    const crosshairVertical = crosshairOverlay.querySelector('.crosshair-line.vertical');
+    const crosshairCenter = crosshairOverlay.querySelector('.crosshair-center');
+    let crosshairRAF = null;
+    let crosshairTargetX = window.innerWidth / 2;
+    let crosshairTargetY = window.innerHeight / 2;
+    
+    function updateCrosshairPosition(x, y) {
+      crosshairTargetX = x;
+      crosshairTargetY = y;
+      if (crosshairRAF) return;
+      crosshairRAF = requestAnimationFrame(() => {
+        crosshairRAF = null;
+        crosshairHorizontal.style.top = `${crosshairTargetY}px`;
+        crosshairVertical.style.left = `${crosshairTargetX}px`;
+        crosshairCenter.style.left = `${crosshairTargetX}px`;
+        crosshairCenter.style.top = `${crosshairTargetY}px`;
+      });
+    }
+    
+    function showCrosshair() {
+      crosshairOverlay.classList.add('show');
+      updateCrosshairPosition(crosshairTargetX, crosshairTargetY);
+    }
+    
+    function hideCrosshair() {
+      crosshairOverlay.classList.remove('show');
+    }
+    
+    mapContainer.addEventListener('mousemove', (event) => {
+      if (!isAddingPin) return;
+      updateCrosshairPosition(event.clientX, event.clientY);
+      showCrosshair();
+    });
+    
+    mapContainer.addEventListener('mouseenter', (event) => {
+      if (!isAddingPin) return;
+      updateCrosshairPosition(event.clientX, event.clientY);
+      showCrosshair();
+    });
+    
+    mapContainer.addEventListener('mouseleave', () => {
+      if (!isAddingPin) return;
+      hideCrosshair();
+    });
+    
+    window.addEventListener('resize', () => {
+      if (!isAddingPin) return;
+      updateCrosshairPosition(window.innerWidth / 2, window.innerHeight / 2);
+    });
+    
+    function setAddPinMode(enabled) {
+      if (enabled) {
+        document.body.classList.add('adding-pin-mode');
         addBtn.textContent = "🟢 点击地图放置图钉";
         addBtn.classList.add("active");
         map.getCanvas().style.cursor = 'crosshair';
+        hidePopup();
+        isPopupLocked = false;
+        showCrosshair();
       } else {
+        document.body.classList.remove('adding-pin-mode');
         addBtn.textContent = "➕ 添加图钉";
         addBtn.classList.remove("active");
         map.getCanvas().style.cursor = '';
+        hideCrosshair();
       }
+      isAddingPin = enabled;
+    }
+    
+    addBtn.addEventListener("click", () => {
+      setAddPinMode(!isAddingPin);
     });
 
     // 点击地图时的处理
@@ -2123,15 +2459,53 @@
         pinTextInput.focus();
         
         // 退出添加模式
-        isAddingPin = false;
-        addBtn.textContent = "➕ 添加图钉";
-        addBtn.classList.remove("active");
-        map.getCanvas().style.cursor = '';
+        setAddPinMode(false);
       } else {
         // 点击地图其他地方，隐藏浮窗并解锁
+        // 先检查是否点击在浮窗上，如果是则不处理
+        const originalEvent = e.originalEvent || window.event;
+        if (originalEvent) {
+          const clickedElement = originalEvent.target;
+          if (clickedElement && pinPopup.contains(clickedElement)) {
+            return; // 点击在浮窗上，不处理
+          }
+        }
         isPopupLocked = false;
         hidePopup();
+        // 确保重置所有图钉状态
+        resetAllPinsState();
       }
+    });
+    
+    // 添加全局鼠标移动监听，检测鼠标是否真的在图钉上
+    let mouseMoveTimeout = null;
+    document.addEventListener('mousemove', (e) => {
+      // 清除之前的定时器
+      if (mouseMoveTimeout) {
+        clearTimeout(mouseMoveTimeout);
+      }
+      
+      // 延迟检查，避免频繁执行
+      mouseMoveTimeout = setTimeout(() => {
+        const allPins = [...pins, ...firebasePins].filter(pin => pin && pin.svgElement);
+        const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY);
+        
+        allPins.forEach(pin => {
+          if (!pin.svgElement) return;
+          
+          const isMouseOver = elementAtPoint === pin.svgElement || 
+                             pin.svgElement.contains(elementAtPoint);
+          const hoverState = pin.svgElement.getAttribute('_hover');
+          
+          // 如果图钉标记为 hover，但鼠标实际不在上面，重置状态
+          if (hoverState === '1' && !isMouseOver && !isPopupLocked) {
+            pin.svgElement.setAttribute('_hover', '0');
+            pin.svgElement.setAttribute('_active', '0');
+            pin.svgElement.style.transition = 'transform 0.3s ease';
+            pin.svgElement.style.transform = 'scale(1)';
+          }
+        });
+      }, 50);
     });
     
     // 右键点击地图时的处理 - 取消放置图钉
@@ -2139,10 +2513,7 @@
       // 如果正在添加图钉模式，取消放置
       if (isAddingPin) {
         e.preventDefault(); // 阻止默认右键菜单
-        isAddingPin = false;
-        addBtn.textContent = "➕ 添加图钉";
-        addBtn.classList.remove("active");
-        map.getCanvas().style.cursor = '';
+        setAddPinMode(false);
         pendingPinLocation = null; // 清除待添加的位置
       }
     });
@@ -2337,10 +2708,7 @@
         imagePreview.classList.add('show');
         
         // 自动激活添加图钉模式
-        isAddingPin = true;
-        addBtn.textContent = "🟢 点击地图放置图钉";
-        addBtn.classList.add("active");
-        map.getCanvas().style.cursor = 'crosshair';
+        setAddPinMode(true);
         
         // 清理localStorage
         localStorage.removeItem('pendingMapPostImage');
@@ -2647,6 +3015,21 @@
       createLocalPin(shinjukuStation, '新宿站');
       console.log('已在新宿站添加本地测试图钉（pin1-1.svg）');
       
+      // 新增 pin1-3 图钉（新宿站附近）
+      const shinjukuStationExtra = [139.7013, 35.6932];
+      createLocalPin(shinjukuStationExtra, 'メイドカフェ', 'img/pin1-3.svg');
+      console.log('已在新宿站附近添加 pin1-3 图钉');
+      
+      // 新增 pin1-2 图钉（新宿御苑）
+      const shinjukuGyoen = [139.7101, 35.6852];
+      createLocalPin(shinjukuGyoen, '新宿御苑', 'img/pin1-2.svg');
+      console.log('已在新宿御苑添加 pin1-2 图钉');
+      
+      // 新增 pin1-5 图钉（新宿西口 3D 猫咪屏幕）
+      const shinjukuCatBillboard = [139.7015, 35.6924];
+      createLocalPin(shinjukuCatBillboard, '新宿西口3D猫咪', 'img/pin1-5.svg');
+      console.log('已在新宿西口 3D 猫咪屏幕添加 pin1-5 图钉');
+      
       // 初始化遮罩层
       updateOverlay();
       
@@ -2657,6 +3040,7 @@
       window.firebaseOnChildAdded(pinsRef, async (snapshot) => {
         const data = snapshot.val();
         const key = snapshot.key;
+        syncPinFavorRecord(key, data);
         
         // 检查是否已经存在该图钉（避免重复）
         const exists = firebasePins.some(pin => pin.firebaseKey === key);
@@ -2711,6 +3095,7 @@
       // 监听删除的图钉
       window.firebaseOnChildRemoved(pinsRef, (snapshot) => {
         const key = snapshot.key;
+        removePinFavorRecord(key);
         
         // 查找并删除对应的图钉
         const pinIndex = firebasePins.findIndex(pin => pin.firebaseKey === key);
@@ -2734,6 +3119,9 @@
           
           // 更新遮罩层
           updateOverlay();
+          
+          // 更新图钉层级
+          updatePinLayerOrder();
         }
       });
       
@@ -2741,6 +3129,7 @@
       window.firebaseOnChildChanged(pinsRef, (snapshot) => {
         const data = snapshot.val();
         const key = snapshot.key;
+        syncPinFavorRecord(key, data);
         
         // 查找对应的图钉并更新
         const pin = firebasePins.find(p => p.firebaseKey === key);
@@ -2887,12 +3276,79 @@
       }
     }
     
-    // 在线用户管理
+    // 在线用户管理 & 好感值统计
     let onlineUsers = {};
+    const userFavorScores = {};
+    const pinFavorRecords = {};
+
+    function calculatePinFavorScore(pinData) {
+      if (!pinData) return 0;
+      if (pinData.source === 'album-ps') return 3;
+      if (pinData.imageURL) return 2;
+      if (pinData.text && pinData.text.trim()) return 1;
+      return 0;
+    }
+
+    function getUserFavorScore(uid) {
+      return uid ? (userFavorScores[uid] || 0) : 0;
+    }
+
+    function updateCurrentUserFavorDisplay() {
+      const favorValueEl = document.getElementById('userFavorValue');
+      if (favorValueEl) {
+        favorValueEl.textContent = getUserFavorScore(currentUID);
+      }
+    }
+
+    function refreshFavorUI() {
+      updateCurrentUserFavorDisplay();
+      updateOnlineUsers();
+    }
+
+    function adjustUserFavorScore(uid, delta, shouldRefresh = true) {
+      if (!uid || typeof delta !== 'number' || Number.isNaN(delta) || delta === 0) {
+        return;
+      }
+      const nextScore = Math.max(0, (userFavorScores[uid] || 0) + delta);
+      userFavorScores[uid] = nextScore;
+      if (shouldRefresh) {
+        refreshFavorUI();
+      }
+    }
+
+    function syncPinFavorRecord(pinKey, pinData) {
+      let touched = false;
+      const previous = pinFavorRecords[pinKey];
+      if (previous && previous.uid) {
+        adjustUserFavorScore(previous.uid, -previous.score, false);
+        touched = true;
+      }
+      if (pinData && pinData.uid) {
+        const score = calculatePinFavorScore(pinData);
+        pinFavorRecords[pinKey] = { uid: pinData.uid, score };
+        adjustUserFavorScore(pinData.uid, score, false);
+        touched = true;
+      } else if (pinFavorRecords[pinKey]) {
+        delete pinFavorRecords[pinKey];
+      }
+      if (touched) {
+        refreshFavorUI();
+      }
+    }
+
+    function removePinFavorRecord(pinKey) {
+      const record = pinFavorRecords[pinKey];
+      if (record && record.uid) {
+        adjustUserFavorScore(record.uid, -record.score, false);
+        delete pinFavorRecords[pinKey];
+        refreshFavorUI();
+      }
+    }
     
     function updateOnlineUsers() {
       const userList = document.getElementById('userList');
       const onlineCount = document.getElementById('onlineCount');
+      if (!userList || !onlineCount) return;
       
       // 清空列表
       userList.innerHTML = '';
@@ -2908,6 +3364,13 @@
       // 分离当前用户和其他用户
       const currentUserEntry = currentUID && onlineUsers[currentUID] ? [currentUID, onlineUsers[currentUID]] : null;
       const otherUsers = Object.entries(onlineUsers).filter(([uid]) => uid !== currentUID);
+      const sortedOtherUsers = otherUsers.sort((a, b) => {
+        const scoreDiff = getUserFavorScore(b[0]) - getUserFavorScore(a[0]);
+        if (scoreDiff !== 0) return scoreDiff;
+        const lastSeenDiff = (b[1].lastSeen || 0) - (a[1].lastSeen || 0);
+        if (lastSeenDiff !== 0) return lastSeenDiff;
+        return a[0].localeCompare(b[0]);
+      });
       
       // 创建用户列表项的辅助函数
       const createUserItem = (uid, userData) => {
@@ -2936,6 +3399,14 @@
         
         item.appendChild(emoji);
         item.appendChild(ip);
+        
+        const favorBadge = document.createElement('div');
+        const favorScore = getUserFavorScore(uid);
+        favorBadge.className = 'favor-badge';
+        favorBadge.textContent = favorScore;
+        favorBadge.title = `好感值 ${favorScore}`;
+        item.appendChild(favorBadge);
+        
         return item;
       };
       
@@ -2946,7 +3417,7 @@
       }
       
       // 再添加其他用户
-      otherUsers.forEach(([uid, userData]) => {
+      sortedOtherUsers.forEach(([uid, userData]) => {
         userList.appendChild(createUserItem(uid, userData));
       });
     }
@@ -3628,6 +4099,7 @@
     // 初始化所有侧边栏功能
     window.addEventListener('firebaseAuthReady', () => {
       currentUID = window.currentUID;
+      updateCurrentUserFavorDisplay();
       initUserInfo();
       initOnlineUsers();
       initChat();
@@ -3638,6 +4110,7 @@
     // 如果Firebase已经准备好，直接初始化
     if (window.currentUID) {
       currentUID = window.currentUID;
+      updateCurrentUserFavorDisplay();
       initUserInfo();
       initOnlineUsers();
       initChat();
