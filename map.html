@@ -983,6 +983,10 @@
       background: #2d2d2d;
       border-radius: 4px;
       border-left: 3px solid #667eea;
+      transition: height 0.7s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  margin-bottom 0.7s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  padding-top 0.7s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  padding-bottom 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
     
     /* 自己的消息样式 - 绿色 */
@@ -1015,6 +1019,26 @@
       color: #a855f7;
     }
     
+    /* 机器人消息样式 - 紫色（默认） */
+    .chat-message.bot-message-purple {
+      background: #261b3a;
+      border-left-color: #a855f7;
+    }
+    
+    .chat-message.bot-message-purple .chat-message-user {
+      color: #a855f7;
+    }
+    
+    /* 机器人消息样式 - 粉紫色 */
+    .chat-message.bot-message-pink {
+      background: #3a2859;
+      border-left-color: #a855f7;
+    }
+    
+    .chat-message.bot-message-pink .chat-message-user {
+      color: #a855f7;
+    }
+    
     .chat-message.new-message {
       animation: slideInMessage 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
     }
@@ -1027,6 +1051,22 @@
       to {
         transform: translateX(0) scale(1);
         opacity: 1;
+      }
+    }
+    
+    .chat-message.removing {
+      animation: slideOutMessage 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      overflow: hidden;
+    }
+    
+    @keyframes slideOutMessage {
+      from {
+        transform: translateX(0) scale(1);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(30px) scale(0.95);
+        opacity: 0;
       }
     }
     
@@ -2306,7 +2346,7 @@
     }
     
     // 删除图钉
-    function deletePin(pinData) {
+    async function deletePin(pinData) {
       if (!confirm('确定要删除这个图钉吗？')) {
         return;
       }
@@ -2314,8 +2354,109 @@
       isPopupLocked = false;
       hidePopup();
       
-      // 从 Firebase 删除
-      const pinRef = window.firebaseRef(window.firebaseDatabase, 'pins/' + pinData.firebaseKey);
+      const pinKey = pinData.firebaseKey;
+      
+      // 先手动触发消息的删除动画
+      const chatMessages = document.getElementById('chatMessages');
+      let animationPromises = [];
+      
+      if (chatMessages && pinKey) {
+        const relatedMessages = chatMessages.querySelectorAll(`[data-pin-key="${pinKey}"]`);
+        relatedMessages.forEach((msgElement) => {
+          // 获取消息的实际高度（包括margin-bottom）
+          const msgHeight = msgElement.offsetHeight;
+          const msgMarginBottom = parseInt(window.getComputedStyle(msgElement).marginBottom) || 8;
+          
+          // 设置固定高度，防止其他消息瞬间移动
+          msgElement.style.height = msgHeight + 'px';
+          msgElement.style.marginBottom = msgMarginBottom + 'px';
+          
+          // 添加删除动画类
+          msgElement.classList.add('removing');
+          
+          // 立即触发重排，让浏览器应用固定高度
+          void msgElement.offsetHeight;
+          
+          // 然后让高度和margin收缩为0，其他消息会平滑下移
+          requestAnimationFrame(() => {
+            msgElement.style.height = '0';
+            msgElement.style.marginBottom = '0';
+            msgElement.style.paddingTop = '0';
+            msgElement.style.paddingBottom = '0';
+          });
+          
+          // 创建Promise来等待动画完成
+          const animationPromise = new Promise((resolve) => {
+            let isResolved = false;
+            const resolveOnce = () => {
+              if (isResolved) return;
+              isResolved = true;
+              resolve();
+            };
+            
+            // 等待transition完成（0.7s）或animation完成（0.4s），以较长的为准
+            msgElement.addEventListener('transitionend', resolveOnce, { once: true });
+            msgElement.addEventListener('animationend', resolveOnce, { once: true });
+            
+            // 作为后备，如果事件没有触发，在1秒后强制resolve
+            setTimeout(resolveOnce, 1000);
+          });
+          
+          animationPromises.push(animationPromise);
+          
+          // 动画结束后移除消息元素
+          animationPromise.then(() => {
+            msgElement.remove();
+            // 从已显示的消息集合中移除
+            const messageKey = msgElement.getAttribute('data-key');
+            if (messageKey) {
+              displayedMessages.delete(messageKey);
+            }
+            // 从已显示的机器人通知集合中移除
+            displayedBotNotifications.delete(pinKey);
+          });
+        });
+      }
+      
+      // 等待所有动画完成
+      await Promise.all(animationPromises);
+      
+      // 动画完成后，删除服务器上相关的通知消息
+      if (window.firebaseDatabase && pinKey) {
+        try {
+          const chatRef = window.firebaseRef(window.firebaseDatabase, 'chat');
+          const chatSnapshot = await window.firebaseGet(chatRef);
+          const chatData = chatSnapshot.val();
+          
+          if (chatData) {
+            // 找出所有 pinKey 等于被删除图钉 key 的消息
+            const messagesToDelete = [];
+            for (const messageKey in chatData) {
+              const message = chatData[messageKey];
+              if (message && message.pinKey === pinKey) {
+                messagesToDelete.push(messageKey);
+              }
+            }
+            
+            // 删除所有相关的通知消息
+            if (messagesToDelete.length > 0) {
+              const deletePromises = messagesToDelete.map(messageKey => {
+                const messageRef = window.firebaseRef(window.firebaseDatabase, 'chat/' + messageKey);
+                return window.firebaseRemove(messageRef);
+              });
+              
+              await Promise.all(deletePromises);
+              console.log(`已删除 ${messagesToDelete.length} 条相关的通知消息`);
+            }
+          }
+        } catch (error) {
+          console.error('删除通知消息失败:', error);
+          // 即使删除通知失败，也继续删除图钉
+        }
+      }
+      
+      // 从 Firebase 删除图钉
+      const pinRef = window.firebaseRef(window.firebaseDatabase, 'pins/' + pinKey);
       window.firebaseRemove(pinRef)
         .then(() => {
           console.log('图钉已删除');
@@ -2843,6 +2984,11 @@
       const msgDiv = document.createElement('div');
       msgDiv.className = 'chat-message bot-message new-message';
       
+      // 如果有图钉数据，添加 data-pin-key 属性以便删除时找到
+      if (pinData && pinData.firebaseKey) {
+        msgDiv.setAttribute('data-pin-key', pinData.firebaseKey);
+      }
+      
       const header = document.createElement('div');
       header.className = 'chat-message-header';
       
@@ -2992,29 +3138,6 @@
           }
         });
         
-        // 监听图钉删除事件，更新按钮状态
-        const updateButtonOnPinRemoved = () => {
-          if (!checkPinExists()) {
-            // 按钮已变灰
-          }
-        };
-        
-        // 定期检查图钉是否存在（当图钉被删除时）
-        const checkInterval = setInterval(() => {
-          if (!checkPinExists()) {
-            clearInterval(checkInterval);
-          }
-        }, 1000);
-        
-        // 当消息元素被移除时，清除定时器
-        const observer = new MutationObserver(() => {
-          if (!msgDiv.parentNode) {
-            clearInterval(checkInterval);
-            observer.disconnect();
-          }
-        });
-        observer.observe(msgDiv.parentNode || document.body, { childList: true });
-        
         content.appendChild(jumpBtn);
       }
       
@@ -3145,7 +3268,8 @@
           console.log('从 Firebase 加载图钉（map02.svg）:', data.text, lngLat);
           
           // 判断是否是新发布的图钉（时间戳在页面加载之后）
-          if (data.time && data.time >= pageLoadTime - 5000) { // 允许5秒误差，处理时间同步问题
+          // 只让发布图钉的用户发送机器人通知，避免多个客户端重复发送
+          if (data.time && data.time >= pageLoadTime - 5000 && data.uid === currentUID) {
             // 获取用户信息
             if (data.uid && window.firebaseDatabase) {
               try {
@@ -3207,6 +3331,59 @@
           
           // 更新图钉层级
           updatePinLayerOrder();
+        }
+        
+        // 找到所有相关的消息并添加删除动画
+        const chatMessages = document.getElementById('chatMessages');
+        if (chatMessages) {
+          const relatedMessages = chatMessages.querySelectorAll(`[data-pin-key="${key}"]`);
+          relatedMessages.forEach((msgElement) => {
+            // 获取消息的实际高度（包括margin-bottom）
+            const msgHeight = msgElement.offsetHeight;
+            const msgMarginBottom = parseInt(window.getComputedStyle(msgElement).marginBottom) || 8;
+            const totalHeight = msgHeight + msgMarginBottom;
+            
+            // 设置固定高度，防止其他消息瞬间移动
+            msgElement.style.height = msgHeight + 'px';
+            msgElement.style.marginBottom = msgMarginBottom + 'px';
+            
+            // 添加删除动画类
+            msgElement.classList.add('removing');
+            
+            // 立即触发重排，让浏览器应用固定高度
+            void msgElement.offsetHeight;
+            
+            // 然后让高度和margin收缩为0，其他消息会平滑下移
+            requestAnimationFrame(() => {
+              msgElement.style.height = '0';
+              msgElement.style.marginBottom = '0';
+              msgElement.style.paddingTop = '0';
+              msgElement.style.paddingBottom = '0';
+            });
+            
+            // 动画结束后移除消息元素
+            // 使用一个标志来确保只删除一次
+            let isRemoved = false;
+            const removeMessage = () => {
+              if (isRemoved) return;
+              isRemoved = true;
+              msgElement.remove();
+              // 从已显示的消息集合中移除
+              const messageKey = msgElement.getAttribute('data-key');
+              if (messageKey) {
+                displayedMessages.delete(messageKey);
+              }
+              // 从已显示的机器人通知集合中移除
+              displayedBotNotifications.delete(key);
+            };
+            
+            // 等待transition完成（0.7s）或animation完成（0.4s），以较长的为准
+            msgElement.addEventListener('transitionend', removeMessage, { once: true });
+            msgElement.addEventListener('animationend', removeMessage, { once: true });
+            
+            // 作为后备，如果事件没有触发，在1秒后强制删除
+            setTimeout(removeMessage, 1000);
+          });
         }
       });
       
@@ -3768,14 +3945,24 @@
       });
     }
     
+    // 用于跟踪已显示的消息，避免重复显示（全局变量，供图钉删除时使用）
+    let displayedMessages = new Set();
+    
+    // 用于跟踪已显示的机器人通知（基于 pinKey），避免重复显示相同图钉的通知（全局变量，供图钉删除时使用）
+    let displayedBotNotifications = new Set();
+    
     // 聊天功能
     function initChat() {
       const chatInput = document.getElementById('chatInput');
       const chatSendBtn = document.getElementById('chatSendBtn');
       const chatMessages = document.getElementById('chatMessages');
       
-      // 用于跟踪已显示的消息，避免重复显示
-      const displayedMessages = new Set();
+      // 重置已显示的消息集合（每次初始化时清空）
+      displayedMessages = new Set();
+      displayedBotNotifications = new Set();
+      
+      // 机器人消息计数器，用于颜色交替
+      let botMessageCount = 0;
       
       // 记录最近发送的消息时间，用于识别新发送的消息
       let lastSentMessageTime = 0;
@@ -3786,10 +3973,27 @@
         if (displayedMessages.has(messageKey)) {
           return;
         }
-        displayedMessages.add(messageKey);
         
         // 判断是否是机器人消息
         const isBotMessage = msgData.bot === true;
+        
+        // 如果是机器人消息但没有 pinKey，不显示
+        if (isBotMessage && !msgData.pinKey) {
+          displayedMessages.add(messageKey);
+          return;
+        }
+        
+        // 如果是机器人消息且有 pinKey，检查是否已经显示过相同图钉的通知
+        if (isBotMessage && msgData.pinKey) {
+          if (displayedBotNotifications.has(msgData.pinKey)) {
+            // 已经显示过这个图钉的通知，跳过
+            displayedMessages.add(messageKey);
+            return;
+          }
+          displayedBotNotifications.add(msgData.pinKey);
+        }
+        
+        displayedMessages.add(messageKey);
         
         // 判断是否是当前用户刚发送的消息
         const isCurrentUser = !isBotMessage && msgData.uid === currentUID;
@@ -3799,9 +4003,21 @@
         msgDiv.className = 'chat-message';
         msgDiv.setAttribute('data-key', messageKey);
         
+        // 如果是机器人消息且有 pinKey，添加 data-pin-key 属性以便删除时找到
+        if (isBotMessage && msgData.pinKey) {
+          msgDiv.setAttribute('data-pin-key', msgData.pinKey);
+        }
+        
         // 根据消息类型添加不同的样式类
         if (isBotMessage) {
           msgDiv.classList.add('bot-message');
+          // 根据计数器交替添加颜色类
+          botMessageCount++;
+          if (botMessageCount % 2 === 0) {
+            msgDiv.classList.add('bot-message-pink');
+          } else {
+            msgDiv.classList.add('bot-message-purple');
+          }
         } else if (isCurrentUser) {
           msgDiv.classList.add('own-message');
         } else {
@@ -3810,6 +4026,11 @@
         
         // 如果是新发送的消息，添加动画类
         if (isNewSentMessage) {
+          msgDiv.classList.add('new-message');
+        }
+        
+        // 如果是机器人消息，也添加动画类
+        if (isBotMessage) {
           msgDiv.classList.add('new-message');
         }
         
@@ -3997,29 +4218,6 @@
             }
           });
           
-          // 监听图钉删除事件，更新按钮状态
-          const updateButtonOnPinRemoved = () => {
-            if (!checkPinExists()) {
-              // 按钮已变灰
-            }
-          };
-          
-          // 定期检查图钉是否存在（当图钉被删除时）
-          const checkInterval = setInterval(() => {
-            if (!checkPinExists()) {
-              clearInterval(checkInterval);
-            }
-          }, 1000);
-          
-          // 当消息元素被移除时，清除定时器
-          const observer = new MutationObserver(() => {
-            if (!msgDiv.parentNode) {
-              clearInterval(checkInterval);
-              observer.disconnect();
-            }
-          });
-          observer.observe(msgDiv.parentNode || document.body, { childList: true });
-          
           content.appendChild(jumpBtn);
         }
         
@@ -4073,6 +4271,19 @@
       // 初始化表情包和常用语功能
       initEmojiPicker();
       initPhrasePicker();
+      
+      // 删除已显示的无图钉机器人消息
+      const existingBotMessages = chatMessages.querySelectorAll('.bot-message');
+      existingBotMessages.forEach((msgElement) => {
+        // 如果没有 data-pin-key 属性，说明是没有图钉的机器人消息，删除它
+        if (!msgElement.hasAttribute('data-pin-key')) {
+          const messageKey = msgElement.getAttribute('data-key');
+          if (messageKey) {
+            displayedMessages.delete(messageKey);
+          }
+          msgElement.remove();
+        }
+      });
       
       // 监听新消息（包括历史消息）
       const chatRef = window.firebaseRef(window.firebaseDatabase, 'chat');
