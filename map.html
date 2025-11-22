@@ -424,13 +424,43 @@
     
     /* 新宿御苑特殊样式 - 黑色底色 */
     #pinPopup.shinjuku-gyoen {
-      background: #000000;
+      background: transparent;
       color: #ffffff;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      padding: 0;
+      width: auto;
+      max-width: 300px;
+      border-radius: 12px;
+      overflow: visible;
+      position: relative;
     }
     
-    #pinPopup.shinjuku-gyoen::after {
+    /* 新宿御苑箭头 */
+    .shinjuku-arrow {
+      position: absolute;
+      bottom: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
       border-top: 8px solid #000000;
+    }
+    
+    /* 新宿御苑内容容器 */
+    .shinjuku-wrapper {
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000000;
+    }
+    
+    /* 新宿御苑图片 */
+    .shinjuku-image {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 12px 12px 0 0;
     }
     
     /* 新宿御苑底部内容区域 */
@@ -440,6 +470,7 @@
       justify-content: space-between;
       align-items: center;
       background: #000000;
+      border-radius: 0 0 12px 12px;
     }
     
     /* 新宿御苑标题 */
@@ -2130,8 +2161,19 @@
       // 清空浮窗内容
       pinPopup.innerHTML = '';
       
-      // 如果是新宿御苑，显示标题和按钮
+      // 如果是新宿御苑，显示图片和底部内容
       if (isShinjukuGyoen) {
+        // 创建包装容器
+        const wrapper = document.createElement('div');
+        wrapper.className = 'shinjuku-wrapper';
+        
+        // 创建图片
+        const img = document.createElement('img');
+        img.src = 'img/img01.jpg';
+        img.className = 'shinjuku-image';
+        img.alt = '新宿御苑';
+        wrapper.appendChild(img);
+        
         // 创建底部内容区域
         const contentDiv = document.createElement('div');
         contentDiv.className = 'shinjuku-content';
@@ -2149,7 +2191,13 @@
         button.type = 'button';
         contentDiv.appendChild(button);
         
-        pinPopup.appendChild(contentDiv);
+        wrapper.appendChild(contentDiv);
+        pinPopup.appendChild(wrapper);
+        
+        // 创建箭头
+        const arrow = document.createElement('div');
+        arrow.className = 'shinjuku-arrow';
+        pinPopup.appendChild(arrow);
         
         // 先更新位置，再显示（避免闪现）
         updatePopupPosition();
