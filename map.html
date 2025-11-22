@@ -422,6 +422,56 @@
       color: #3a3a3a;
     }
     
+    /* 新宿御苑特殊样式 - 黑色底色 */
+    #pinPopup.shinjuku-gyoen {
+      background: #000000;
+      color: #ffffff;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+    
+    #pinPopup.shinjuku-gyoen::after {
+      border-top: 8px solid #000000;
+    }
+    
+    /* 新宿御苑底部内容区域 */
+    .shinjuku-content {
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #000000;
+    }
+    
+    /* 新宿御苑标题 */
+    .shinjuku-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #ffffff;
+      margin: 0;
+    }
+    
+    /* 新宿御苑按钮 */
+    .shinjuku-button {
+      background: #ffffff;
+      color: #000000;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .shinjuku-button:hover {
+      background: #f0f0f0;
+      transform: scale(1.05);
+    }
+    
+    .shinjuku-button:active {
+      transform: scale(0.98);
+    }
+    
     #pinPopup.show {
       opacity: 1;
       /* 显示状态：底部居中，正常大小 */
@@ -2031,10 +2081,45 @@
       
       currentPopupPin = pinData;
       const isAlbumPin = pinData.source === 'album-ps';
+      const isShinjukuGyoen = pinData.text === '新宿御苑';
+      
+      // 设置特殊样式类
       pinPopup.classList.toggle('ps-pin', isAlbumPin);
+      pinPopup.classList.toggle('shinjuku-gyoen', isShinjukuGyoen);
       
       // 清空浮窗内容
       pinPopup.innerHTML = '';
+      
+      // 如果是新宿御苑，显示标题和按钮
+      if (isShinjukuGyoen) {
+        // 创建底部内容区域
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'shinjuku-content';
+        
+        // 创建标题
+        const title = document.createElement('h3');
+        title.className = 'shinjuku-title';
+        title.textContent = '新宿御苑';
+        contentDiv.appendChild(title);
+        
+        // 创建按钮
+        const button = document.createElement('button');
+        button.className = 'shinjuku-button';
+        button.textContent = '行く';
+        button.type = 'button';
+        contentDiv.appendChild(button);
+        
+        pinPopup.appendChild(contentDiv);
+        
+        // 先更新位置，再显示（避免闪现）
+        updatePopupPosition();
+        
+        // 使用 requestAnimationFrame 确保位置更新后再显示
+        requestAnimationFrame(() => {
+          pinPopup.classList.add('show');
+        });
+        return; // 提前返回，不执行后续的内容添加
+      }
 
       if (isAlbumPin) {
         const badge = document.createElement('button');
