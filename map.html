@@ -446,6 +446,13 @@
       border-left: 8px solid transparent;
       border-right: 8px solid transparent;
       border-top: 8px solid #000000;
+      z-index: 1; /* 确保在 ::after 伪元素之上 */
+    }
+    
+    /* 隐藏新宿御苑的默认 ::after 箭头 */
+    #pinPopup.shinjuku-gyoen::after {
+      display: none;
+      content: none;
     }
     
     /* 新宿御苑内容容器 */
