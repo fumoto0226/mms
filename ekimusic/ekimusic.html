@@ -1,0 +1,1320 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map Modal (Vanilla JS Version)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- 
+      ==================================================================================
+      🟢 CSS 样式区域 / CSSスタイルエリア
+      (请将这部分复制到你的 map.html 的 <style> 标签中)
+      (この部分を map.html の <style> タグにコピーしてください)
+      ================================================================================== 
+    -->
+    <style>
+        body { margin: 0; font-family: 'Noto Sans JP', sans-serif; overflow: hidden; }
+
+        /* -----------------------------------------------------------
+           1. 弹窗容器 (Modal Container)
+           控制背景遮罩的样式
+        ----------------------------------------------------------- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4); /* 半透明背景 */
+            backdrop-filter: blur(2px); /* 背景模糊 */
+            z-index: 1000; /* 保证在最上层 */
+            
+            /* 居中布局 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+
+            /* 初始状态：隐藏 */
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        /* 激活状态：显示 */
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* -----------------------------------------------------------
+           2. 弹窗主体 (Modal Body)
+           控制白色卡片的样式和动画
+        ----------------------------------------------------------- */
+        .modal-content {
+            background-color: white;
+            /* 尺寸调整：变大 */
+            width: 90%;
+            max-width: 1000px; /* 原来 900px */
+            height: 85vh;      /* 原来 600px -> 改成视口高度的 85% */
+            max-height: 800px;
+            
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            position: relative;
+            
+            /* 内部布局 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            /* justify-content: center; */
+            padding: 40px;
+            overflow-y: auto; /* 防止内容溢出 */
+
+            /* 初始动画状态：稍微缩小并向下位移 */
+            transform: scale(0.95) translateY(20px);
+            opacity: 0;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+        }
+
+        /* 激活状态：正常大小和位置 */
+        .modal-overlay.active .modal-content {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+        }
+
+        /* -----------------------------------------------------------
+           3. 关闭按钮 (Close Button)
+        ----------------------------------------------------------- */
+        .close-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+        .close-btn:hover {
+            background-color: #f3f4f6;
+        }
+        /* 用 CSS 画一个叉叉 (避免依赖 SVG 库) */
+        .close-btn::before, .close-btn::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 2px;
+            background-color: #9ca3af;
+            border-radius: 1px;
+        }
+        .close-btn::before { transform: rotate(45deg); }
+        .close-btn::after { transform: rotate(-45deg); }
+        .close-btn:hover::before, .close-btn:hover::after { background-color: #1f2937; }
+
+        /* -----------------------------------------------------------
+           4. 模拟地图环境样式 (仅用于演示，不需要复制)
+           シミュレーション用スタイル (コピー不要)
+        ----------------------------------------------------------- */
+        .simulated-map {
+            width: 100vw;
+            height: 100vh;
+            background-color: #e5e5f7;
+            background-image: linear-gradient(#cdd1d6 1px, transparent 1px), linear-gradient(to right, #cdd1d6 1px, #e5e5f7 1px);
+            background-size: 40px 40px;
+            position: relative;
+        }
+        .map-ui-search {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            color: #888;
+            font-size: 14px;
+            width: 250px;
+        }
+        .map-pin {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        .map-pin:hover { transform: translate(-50%, -50%) scale(1.1); }
+        .pin-icon {
+            width: 40px;
+            height: 40px;
+            background-color: #ef4444;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            margin: 0 auto;
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .pin-shadow {
+            width: 20px;
+            height: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 50%;
+            margin: -5px auto 0;
+            filter: blur(2px);
+        }
+        /* -----------------------------------------------------------
+           5. メロディクイズ用の追加スタイル
+        ----------------------------------------------------------- */
+        /* 背景覆盖 */
+        body { background: #0b0f1d; color: #e5e7eb; }
+        .modal-content {
+            background: linear-gradient(145deg, #0f1329 0%, #0b0f1d 50%, #111936 100%);
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.45), 0 0 0 1px rgba(72,198,255,0.1) inset;
+            color: #fff;
+        }
+
+        .game-shell {
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            gap: 16px;
+        }
+        .game-header {
+            text-align: center;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .tagline {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: rgba(72,198,255,0.14);
+            color: #9be8ff;
+            border: 1px solid rgba(72,198,255,0.4);
+            border-radius: 999px;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+            box-shadow: 0 0 10px rgba(72,198,255,0.2);
+        }
+        .game-title {
+            margin: 16px 0 10px;
+            color: #fff;
+            text-shadow: 2px 2px 0px #ff4fd8, -2px -2px 0px #48c6ff;
+            font-size: 32px;
+            letter-spacing: 2px;
+            font-weight: 900;
+            transform: skew(-2deg);
+        }
+        .game-desc {
+            margin: 0;
+            color: #cbd5f5;
+            line-height: 1.6;
+            font-size: 15px;
+        }
+        .panel {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-grow: 1;
+        }
+        /* Panel 通用样式重置：去掉背景框，直接居中 */
+        .panel {
+            width: 100%;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* 内容水平居中 */
+            gap: 35px;
+        }
+
+        /* 专门给进度条加点背景，不然看不清 */
+        .status {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(4px);
+            padding: 8px 16px;
+            border-radius: 999px;
+            justify-content: space-between;
+        }
+
+        /* 专门给播放器加样式 */
+        .audio-box {
+            width: 100%;
+            max-width: 520px;
+            background: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+        }
+
+        /* 选项区域限制宽度 */
+        .options {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap; /* 允许换行 */
+            gap: 12px;
+        }
+        .option-btn {
+            min-width: 120px; /* 保证按钮宽度一致 */
+            flex: 1;
+            /* 保持之前的可爱样式 */
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 14px;
+        }
+        /* Intro Panel 特殊样式：透明背景，内容大字体居中 */
+        #introPanel {
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            backdrop-filter: none;
+            max-width: 100%;
+            padding: 0;
+            gap: 24px;
+        }
+        #introPanel .intro-title {
+            font-size: 24px;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 0 20px rgba(72,198,255,0.6);
+            letter-spacing: 2px;
+        }
+        #introPanel .intro-text {
+            font-size: 16px;
+            color: #cbd5f5;
+            line-height: 1.8;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+        .audio-box {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            background: linear-gradient(135deg, #1d2345, #2b1a38);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #e0f2fe;
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);
+        }
+        .audio-meta {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-top: 4px;
+        }
+        .btn {
+            border: none;
+            border-radius: 50%; /* 圆形按钮 */
+            width: 48px;
+            height: 48px;
+            padding: 0;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 18px; /* 图标大一点 */
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            line-height: 1;
+        }
+        .btn#startBtn, .btn#nextBtn, .btn[type="submit"] {
+            border-radius: 14px; /* 长按钮保持圆角矩形 */
+            width: auto;
+            height: auto;
+            padding: 12px 24px;
+            font-size: 15px;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
+        .btn:active { transform: translateY(0); }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #ff4fd8, #48c6ff);
+            color: #fff;
+            box-shadow: 0 6px 0 rgba(72,198,255,0.4), 0 12px 20px rgba(0,0,0,0.3);
+            border: 2px solid rgba(255,255,255,0.2);
+            font-size: 16px;
+            letter-spacing: 1px;
+        }
+        .btn-primary:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 rgba(72,198,255,0.4), 0 6px 10px rgba(0,0,0,0.3);
+        }
+        .btn-ghost {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        /* 音符播放按钮 */
+        .note-btn {
+            width: 96px;
+            height: 96px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(145deg, #ff4fd8, #48c6ff);
+            box-shadow: 0 10px 30px rgba(72,198,255,0.35);
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .note-btn:hover { transform: translateY(-3px) scale(1.02); }
+        .note-btn:active { transform: translateY(1px) scale(0.98); }
+        .note-icon {
+            width: 42px;
+            height: 42px;
+            fill: #fff;
+        }
+
+        .wave-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 6px;
+            height: 48px;
+            opacity: 0.35;
+            transition: opacity 0.2s ease;
+        }
+        .wave-bars .bar {
+            width: 6px;
+            background: linear-gradient(180deg, rgba(255,149,107,0.9), rgba(255,149,107,0.5));
+            border-radius: 3px;
+            height: 10px;
+        }
+        /* 静止状态每根高度略有差异 */
+        .wave-bars .bar:nth-child(3n) { height: 14px; }
+        .wave-bars .bar:nth-child(4n) { height: 18px; }
+        .audio-playing .wave-bars { opacity: 1; }
+        .audio-playing .wave-bars .bar {
+            animation: waveHeight 1s ease-in-out infinite;
+        }
+        /* 交错延迟让波形左右律动 */
+        .audio-playing .wave-bars .bar:nth-child(1) { animation-delay: 0s; }
+        .audio-playing .wave-bars .bar:nth-child(2) { animation-delay: 0.05s; }
+        .audio-playing .wave-bars .bar:nth-child(3) { animation-delay: 0.1s; }
+        .audio-playing .wave-bars .bar:nth-child(4) { animation-delay: 0.15s; }
+        .audio-playing .wave-bars .bar:nth-child(5) { animation-delay: 0.2s; }
+        .audio-playing .wave-bars .bar:nth-child(6) { animation-delay: 0.25s; }
+        .audio-playing .wave-bars .bar:nth-child(7) { animation-delay: 0.3s; }
+        .audio-playing .wave-bars .bar:nth-child(8) { animation-delay: 0.35s; }
+        .audio-playing .wave-bars .bar:nth-child(9) { animation-delay: 0.4s; }
+        .audio-playing .wave-bars .bar:nth-child(10) { animation-delay: 0.45s; }
+        .audio-playing .wave-bars .bar:nth-child(11) { animation-delay: 0.5s; }
+        .audio-playing .wave-bars .bar:nth-child(12) { animation-delay: 0.55s; }
+
+        @keyframes waveHeight {
+            0%   { height: 8px;  opacity: 0.7; }
+            25%  { height: 26px; opacity: 1; }
+            50%  { height: 18px; opacity: 0.9; }
+            75%  { height: 30px; opacity: 1; }
+            100% { height: 10px; opacity: 0.8; }
+        }
+        /* 面板/结果出现动效 */
+        .fade-in {
+            animation: fadeInUp 0.35s ease;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(14px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        /* 分数字号弹跳动效 */
+        .score-pop {
+            display: inline-block;
+            animation: popNumber 0.55s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+        @keyframes popNumber {
+            0%   { transform: scale(0.6); opacity: 0; }
+            60%  { transform: scale(1.12); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+        /* 结果分数容器样式 */
+        .score-wrap {
+            margin-bottom: 32px;
+        }
+        .score-number {
+            font-size: 80px;
+            font-weight: 900;
+            color: #fff;
+            line-height: 1;
+            text-shadow: 4px 4px 0 #2563eb;
+            display: inline-flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+        .score-denom {
+            font-size: 28px;
+            color: #94a3b8;
+        }
+        .options {
+            width: 100%;
+            max-width: 640px;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 14px;
+            margin-top: 20px;
+        }
+        .option-btn {
+            min-width: 140px;
+            flex: 1 1 140px;
+            background: linear-gradient(135deg, rgba(80,95,160,0.9), rgba(50,70,140,0.92));
+            border: 1.5px solid rgba(124,242,255,0.6);
+            border-radius: 14px;
+            padding: 14px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.12s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease, filter 0.12s ease;
+            font-weight: 700;
+            font-size: 15px;
+            color: #f8fafc;
+            white-space: nowrap;
+            box-shadow: 0 12px 24px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.08);
+        }
+        .option-btn:hover { 
+            transform: translateY(-3px) scale(1.02);
+            border-color: rgba(124,242,124,0.9);
+            box-shadow: 0 16px 32px rgba(37,150,255,0.35);
+            background: linear-gradient(135deg, rgba(124,242,124,0.28), rgba(80,95,200,0.95));
+            filter: brightness(1.08);
+        }
+        .option-btn:active {
+            transform: translateY(1px) scale(0.99);
+            filter: brightness(0.94);
+        }
+        .option-btn.correct { 
+            background: rgba(124,242,124,0.18);
+            border-color: #7cf27c;
+            color: #7cf27c;
+            animation: pulseCorrect 0.4s ease;
+        }
+        .option-btn.wrong { 
+            background: rgba(255,79,216,0.2); 
+            border-color: #ff4fd8; 
+            color: #ff4fd8; 
+            animation: shakeWrong 0.3s ease;
+        }
+        @keyframes pulseCorrect {
+            0%   { transform: scale(0.94); box-shadow: 0 0 0 rgba(124,242,124,0.2); }
+            60%  { transform: scale(1.05); box-shadow: 0 12px 24px rgba(124,242,124,0.25); }
+            100% { transform: scale(1); box-shadow: 0 8px 18px rgba(124,242,124,0.18); }
+        }
+        @keyframes shakeWrong {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-3px); }
+            100% { transform: translateX(0); }
+        }
+        .option-guide {
+            margin-top: 10px;
+            color: #9fb3ff;
+            font-size: 13px;
+            text-align: center;
+            letter-spacing: 0.3px;
+        }
+        .logos {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        /* 隐藏题目标题文本 */
+        #questionTitle { display: none; }
+        .logo-chip {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            background: #fff;
+            border: 3px solid #e0f2fe;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            display: grid;
+            place-items: center;
+            overflow: hidden;
+            font-size: 10px;
+            color: #9fb3c8;
+            transition: transform 0.2s;
+        }
+        .logo-chip:hover { transform: scale(1.05); }
+        .logo-chip img { width: 100%; height: 100%; object-fit: contain; }
+        
+        .status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #94a3b8;
+            background: rgba(0,0,0,0.2);
+            padding: 8px 16px;
+            border-radius: 999px;
+            margin-bottom: 20px !important;
+        }
+        .progress {
+            background: rgba(255,255,255,0.1);
+            border-radius: 999px;
+            height: 6px;
+            overflow: hidden;
+            width: 120px !important;
+        }
+        .progress-inner {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ff4fd8, #48c6ff, #7cf27c);
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 0 10px rgba(72,198,255,0.5);
+        }
+        .fact-box {
+            margin-top: 20px;
+            background: rgba(72,198,255,0.05);
+            border: 1px solid rgba(72,198,255,0.2);
+            border-radius: 16px;
+            padding: 20px;
+            color: #e0f2fe;
+            line-height: 1.7;
+            font-size: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        /* 豆知識用 吹き出し + エイリアン */
+        .fact-container {
+            width: 100%;
+            max-width: 920px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 18px;
+            flex-wrap: nowrap;
+        }
+        .alien-img {
+            width: 152px;
+            height: auto;
+            filter: drop-shadow(0 8px 16px rgba(0,0,0,0.35));
+            /* 可调位置/缩放的自定义属性 */
+            position: relative;
+            left: var(--alien-x, 115px);
+            top: var(--alien-y, 200px);
+            transform: translate(var(--alien-tx, 0px), var(--alien-ty, 0px)) scale(var(--alien-scale, 1));
+        }
+        .speech {
+            position: relative;
+            padding: 48px 64px;
+            min-height: 220px;
+            min-width: 560px;
+            max-width: 720px;
+            color: #e5e7eb;
+            line-height: 1.7;
+            font-size: 16px;
+            box-shadow: none;
+            background: none;
+        }
+        .speech::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: url('./frame.png') center/contain no-repeat;
+            z-index: 0;
+        }
+        #factText {
+            color: #e5e7eb;
+            font-size: 15px;
+            line-height: 1.8;
+            white-space: pre-line;
+            position: relative;
+            z-index: 1;
+            padding: 40px 90px;
+        }
+        /* 结果页/豆知識 下一步按钮 固定在面板底部，可用 CSS 变量微调 */
+        .fact-actions {
+            position: absolute;
+            bottom: var(--fact-btn-bottom, 36px);
+            left: 50%;
+            transform: translateX(-50%) translate(var(--fact-btn-tx, 0px), var(--fact-btn-ty, -45px));
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            width: auto;
+        }
+        .upload-box {
+            background: rgba(16,20,44,0.6);
+            color: #cbd5f5;
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid rgba(72,198,255,0.2);
+            backdrop-filter: blur(5px);
+        }
+        .upload-box label { display: block; font-size: 14px; margin-bottom: 6px; color: #9be8ff; font-weight: 600; }
+        .upload-box input, .upload-box select, .upload-box textarea {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            margin-bottom: 16px;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+        .upload-box input:focus, .upload-box textarea:focus {
+            outline: none;
+            border-color: #48c6ff;
+            background: rgba(0,0,0,0.5);
+        }
+        .upload-box small { color: #64748b; display: block; margin-top: -12px; margin-bottom: 16px; font-size: 12px; }
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 999px;
+            font-size: 12px;
+            margin: 0 6px 6px 0;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- 
+      ==================================================================================
+      🔴 模拟地图页面 (map.html) / 模擬地図ページ
+      ================================================================================== 
+    -->
+    <div class="simulated-map">
+        <!-- 模拟 UI -->
+        <div class="map-ui-search">🔍 Search location...</div>
+        
+        <!-- 模拟地图上的点击触发点 (Pin) -->
+        <div class="map-pin" onclick="openModal()">
+            <div class="pin-icon"></div>
+            <div class="pin-shadow"></div>
+            <div style="margin-top:10px; font-weight:bold; color:#444;">信号を捕捉</div>
+        </div>
+    </div>
+
+
+    <!-- 
+      ==================================================================================
+      🟢 弹窗 HTML 结构 / ポップアップ HTML 構造
+      (请将这部分复制到你的 map.html 的 <body> 结束前)
+      (この部分を map.html の <body> 終了直前にコピーしてください)
+      ================================================================================== 
+    -->
+    
+    <!-- 弹窗遮罩层 -->
+    <div id="myModal" class="modal-overlay" onclick="closeModal()">
+        <!-- 弹窗内容卡片 (阻止冒泡，防止点击卡片关闭) -->
+        <div class="modal-content" onclick="event.stopPropagation()">
+            
+            <!-- 关闭按钮 -->
+            <button class="close-btn" onclick="closeModal()" aria-label="Close"></button>
+
+            <!-- 👇👇👇 内容区域 / コンテンツエリア 👇👇👇 -->
+            <div class="game-shell">
+                <div class="game-header">
+                    <div class="tagline">mm星人・新宿滞留ログ</div>
+                    <h2 class="game-title">発車メロディ信号クイズ</h2>
+                    <p class="game-desc">ピピピ… 地球の「エキ」から流れる不思議なメロディをキャッチしたよ！<br>音を聴いて、どの駅の信号か当ててみてね。</p>
+                </div>
+
+                <div class="game-body">
+                    <!-- Intro -->
+                    <div id="introPanel" class="panel">
+                        <div class="intro-title">MISSION START</div>
+                        <div class="intro-text">
+                            新宿エリアで未確認の「発車メロディ」を多数検知。<br>
+                            これより信号の解析を開始する。<br>
+                            準備はいいか？地球の調査員よ。
+                        </div>
+                        <button id="startBtn" class="btn btn-primary" style="align-self:center; min-width:180px; margin-top:10px;">
+                            解析任務を開始 🚀
+                        </button>
+                    </div>
+
+                    <!-- Question -->
+                    <div id="questionPanel" class="panel hidden">
+                        <div class="status" style="margin-bottom:8px;">
+                            <div id="statusText">ステータス: 信号探知中…</div>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                <span>進行</span>
+                                <div class="progress" style="width:140px;"><div id="progressBar" class="progress-inner"></div></div>
+                                <span id="progressCount">0/0</span>
+                            </div>
+                        </div>
+
+                        <div class="audio-box" id="audioWrapper">
+                            <div class="wave-bars" id="waveLeft">
+                                <span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>
+                                <span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>
+                            </div>
+                            <button id="playToggleBtn" class="note-btn" aria-label="再生/停止">
+                                <svg class="note-icon" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M20 16v32l28-16z"/>
+                                </svg>
+                            </button>
+                            <div class="wave-bars" id="waveRight">
+                                <span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>
+                                <span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:12px; text-align:center;">
+                            <h3 id="questionTitle">MISSION: 発信元を特定せよ！</h3>
+                            <div style="font-size:12px; color:#475569; display:flex; align-items:center; justify-content:center; gap:8px;">
+                                <span>ヒントデータ: 近くで検出されたロゴ</span>
+                                <button id="hintBtn" class="btn btn-ghost hint-btn" aria-label="ヒント" title="ヒント" style="padding:0; width:36px; height:36px; border-radius:50%; display:grid; place-items:center; font-size:16px;">👁</button>
+                            </div>
+                            <div class="logos hidden" id="logoHints" style="justify-content:center;"></div>
+                            <div class="option-guide">下の選択肢をタップして答えてね</div>
+                        </div>
+
+                        <div class="options" id="optionsArea" style="justify-items:center;"></div>
+                        <div id="errorText" class="fact-box hidden" style="background:rgba(255,79,216,0.15); border-color:#ff4fd8; color:#ffc8f2;">ピーッ！解析エラー。<br>違う駅みたい…もう一度試してみて！💦</div>
+                    </div>
+
+                    <!-- Fact -->
+                    <div id="factPanel" class="panel hidden" style="text-align:center;">
+                        
+                        <div class="fact-container">
+                            <img src="./mm.png" alt="mm alien" class="alien-img">
+                            <div class="speech">
+                                <div id="factText"></div>
+                            </div>
+                        </div>
+                        <div class="fact-actions">
+                            <button id="nextBtn" class="btn btn-primary">次の信号へ 🛸</button>
+                        </div>
+                    </div>
+
+                    <!-- Result -->
+                    <div id="resultView" class="panel hidden" style="text-align:center; width:100%; max-width:720px; margin: 0 auto; align-items:center;"></div>
+
+                </div>
+            </div>
+            <!-- 👆👆👆 内容结束 / コンテンツ終了 👆👆👆 -->
+
+        </div>
+    </div>
+
+
+    <!-- 
+      ==================================================================================
+      🟢 JS 逻辑区域 / JS ロジックエリア
+      (请将这部分复制到你的 map.html 的 <script> 标签中)
+      (この部分を map.html の <script> タグにコピーしてください)
+      ================================================================================== 
+    -->
+    <script>
+        // 获取弹窗元素
+        const modal = document.getElementById('myModal');
+
+        // データ: ロゴIDはディレクトリ名とファイル名をそのまま保持
+        // audioUrl と interchangeLogos は後で差し込めるよう空で用意
+        const quizData = [
+            { 
+                id: 'q-1', 
+                station: '新宿駅', 
+                audioUrl: './電車メロディ/mp3/新宿駅.mp3', 
+                options: ['新宿駅','渋谷駅','池袋駅'], 
+                answerIndex: 0, 
+                interchangeLogos: ['JR_JY_line_symbol.svg', 'JR_JC_line_symbol.svg', 'Logo_of_Tokyo_Metro_Marunouchi_Line.svg', 'Toei_Shinjuku_line_symbol.svg', 'Toei_Oedo_line_symbol.svg'], 
+                fact: '地球人多すぎ！この駅はまるで巨大迷路。<br>1日350万人も移動してるらしい。<br>母星の全人口より多いじゃないか…！<br>迷子になったら一生出られないかも。' 
+            },
+            { 
+                id: 'q-2', 
+                station: '東京駅', 
+                audioUrl: './電車メロディ/mp3/東京駅.mp3', 
+                options: ['東京駅','有楽町駅','新橋駅'], 
+                answerIndex: 0, 
+                interchangeLogos: ['JR_JY_line_symbol.svg', 'JR_JC_line_symbol.svg', 'Logo_of_Tokyo_Metro_Marunouchi_Line.svg'], 
+                fact: 'レンガ造りのレトロな基地を発見！<br>ここから新幹線という超高速移動ポッドが発射されるらしい。<br>駅弁というエネルギー補給物質の種類が異常に多いぞ。' 
+            },
+            { 
+                id: 'q-3', 
+                station: '中野駅', 
+                audioUrl: './電車メロディ/mp3/中野駅.mp3', 
+                options: ['中野駅','高円寺駅','荻窪駅'], 
+                answerIndex: 0, 
+                interchangeLogos: ['JR_JC_line_symbol.svg', 'Logo_of_Tokyo_Metro_Tōzai_Line.svg'], 
+                fact: 'サブカルチャーの聖地？なんだか親近感が湧く場所だ。<br>ブロードウェイという建物には、<br>地球のフィギュアや漫画が山のように積まれているらしい。<br>収集癖のある仲間を呼びたい。' 
+            },
+            { 
+                id: 'q-4', 
+                station: '池袋駅', 
+                audioUrl: './電車メロディ/mp3/池袋駅.mp3', 
+                options: ['池袋駅','東池袋駅','要町駅'], 
+                answerIndex: 0, 
+                interchangeLogos: ['JR_JY_line_symbol.svg', 'Logo_of_Tokyo_Metro_Marunouchi_Line.svg', 'Logo_of_Tokyo_Metro_Fukutoshin_Line.svg', 'Logo_of_Tokyo_Metro_Yūrakuchō_Line.svg', 'SeibuIkebukuro.svg'], 
+                fact: '東口に西武があって、西口に東武がある…<br>地球人は方向感覚を試しているのか？<br>フクロウの像が守り神らしい。<br>ラーメン激戦区という情報もキャッチ！' 
+            },
+            { 
+                id: 'q-5', 
+                station: '高田馬場駅', 
+                audioUrl: './電車メロディ/mp3/高田馬場駅.mp3', 
+                options: ['高田馬場駅','新高円寺駅','早稲田駅'], 
+                answerIndex: 0, 
+                interchangeLogos: ['JR_JY_line_symbol.svg', 'Logo_of_Tokyo_Metro_Tōzai_Line.svg', 'SeibuShinjuku.svg'], 
+                fact: '「鉄腕アトム」のメロディだ！<br>この街は学生という若い地球人で溢れている。<br>安くて多いエネルギー食（大盛り）が好まれるらしい。<br>活気がすごいぞ。' 
+            },
+            { 
+                id: 'q-6', 
+                station: '恵比寿駅', 
+                audioUrl: './電車メロディ/mp3/恵比寿駅.mp3', 
+                options: ['恵比寿駅','阿佐ヶ谷駅','秋葉原駅'], 
+                answerIndex: 0, 
+                interchangeLogos: ['JR_JY_line_symbol.svg', 'Logo_of_Tokyo_Metro_Hibiya_Line.svg'], 
+                fact: 'おしゃれな地球人が集まるエリア。<br>ビールの名前が駅名になったらしいぞ。<br>ガーデンプレイスという場所はデートスポット？<br>我々の星にも導入すべき概念だ。' 
+            },
+            { 
+                id: 'q-7', 
+                station: '阿佐ヶ谷駅', 
+                audioUrl: './電車メロディ/mp3/阿佐ヶ谷駅.mp3', 
+                options: ['阿佐ヶ谷駅','恵比寿駅','荻窪駅'], 
+                answerIndex: 0, 
+                interchangeLogos: ['JR_JC_line_symbol.svg'], 
+                fact: 'ジャズストリート？音楽好きな地球人が多いようだ。<br>七夕祭りという星を眺めるイベントもあるらしい。<br>並木道が綺麗で、住みやすそうなシェルター（家）が多いな。' 
+            },
+            { 
+                id: 'q-8', 
+                station: '駒込駅', 
+                audioUrl: './電車メロディ/mp3/駒込駅.mp3', 
+                options: ['駒込駅','中野駅','高円寺駅'], 
+                answerIndex: 0, 
+                interchangeLogos: ['JR_JY_line_symbol.svg', 'Logo_of_Tokyo_Metro_Namboku_Line.svg'], 
+                fact: '「さくらさくら」のメロディ。<br>ソメイヨシノという地球の植物の発祥地らしい。<br>春になるとピンク色に染まる…美しい光景だ。<br>データ容量がいっぱいになりそう！' 
+            },
+            { 
+                id: 'q-9', 
+                station: '銀座駅', 
+                audioUrl: './電車メロディ/mp3/銀座駅.mp3', 
+                options: ['銀座駅','新橋駅','有楽町駅'], 
+                answerIndex: 0, 
+                interchangeLogos: ['Logo_of_Tokyo_Metro_Ginza_Line.svg', 'Logo_of_Tokyo_Metro_Marunouchi_Line.svg', 'Logo_of_Tokyo_Metro_Hibiya_Line.svg'], 
+                fact: 'なんという高級感！<br>地価がとんでもなく高いらしい。<br>古い伝統と最新モードが融合している。<br>デパートの地下には美味しい地球食が無限にあるぞ…<br>危険なエリアだ。' 
+            }
+        ];
+
+        // 路線名 -> ロゴID マッピング（必要に応じて追加）
+        const lineIdMap = {
+            'JR山手線': 'JR_JY_line_symbol.svg',
+            'JR中央快速線': 'JR_JC_line_symbol.svg',
+            'JR総武線': 'JR_JB_line_symbol.svg',
+            'JR埼京線': 'JR_JA_line_symbol.svg',
+            'JR湘南新宿ライン': 'JR_JT_line_symbol.svg',
+            '東京メトロ丸ノ内線': 'Logo_of_Tokyo_Metro_Marunouchi_Line.svg',
+            '東京メトロ副都心線': 'Logo_of_Tokyo_Metro_Fukutoshin_Line.svg',
+            '都営新宿線': 'Toei_Shinjuku_line_symbol.svg',
+            '都営大江戸線': 'Toei_Oedo_line_symbol.svg',
+            '西武新宿線': 'SeibuShinjuku.svg'
+        };
+
+        // DOM 参照
+        const introPanel = document.getElementById('introPanel');
+        const questionPanel = document.getElementById('questionPanel');
+        const factPanel = document.getElementById('factPanel');
+        const startBtn = document.getElementById('startBtn');
+        const statusText = document.getElementById('statusText');
+        const progressBar = document.getElementById('progressBar');
+        const progressCount = document.getElementById('progressCount');
+        const playToggleBtn = document.getElementById('playToggleBtn');
+        const waveLeft = document.getElementById('waveLeft');
+        const waveRight = document.getElementById('waveRight');
+        const audioWrapper = document.getElementById('audioWrapper');
+        const hintBtn = document.getElementById('hintBtn');
+        const questionTitle = document.getElementById('questionTitle');
+        const logoHints = document.getElementById('logoHints');
+        const optionsArea = document.getElementById('optionsArea');
+        const errorText = document.getElementById('errorText');
+        const factText = document.getElementById('factText');
+        const nextBtn = document.getElementById('nextBtn');
+        const audioMeta = document.getElementById('audioMeta');
+        const uploadForm = null;
+        const uploadLines = null;
+        const uploadMessage = null;
+        const logoSamples = null;
+        const uploadPanel = null;
+
+        // 状態
+        let currentIndex = 0;
+        let answered = false;
+        let currentOptions = [];
+        let currentAnswerIndex = 0;
+        let audioEl = new Audio();
+        audioEl.preload = 'none';
+
+        function resolveLogoPath(logoId) {
+            if (!logoId) return '';
+            if (logoId.startsWith('JR_')) return `./電車のマーク/JR/${logoId}`;
+            if (logoId.startsWith('Logo_of_Tokyo_Metro')) return `./電車のマーク/東京メトロマーク/${logoId}`;
+            if (logoId.startsWith('Toei_')) return `./電車のマーク/都営地下鉄マーク/${logoId}`;
+            if (logoId.startsWith('Seibu')) return `./電車のマーク/西武鉄道/${logoId}`;
+            return '';
+        }
+
+        function setProgress() {
+            const total = quizData.length;
+            const current = Math.min(currentIndex + 1, total);
+            progressCount.textContent = `${current}/${total}`;
+            const percent = Math.round((currentIndex) / total * 100);
+            progressBar.style.width = `${percent}%`;
+        }
+
+        function renderLogos(logos) {
+            logoHints.innerHTML = '';
+            if (!logos || logos.length === 0) {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'logo-chip';
+                placeholder.textContent = 'ロゴ未設定';
+                logoHints.appendChild(placeholder);
+                return;
+            }
+            logos.forEach(id => {
+                const path = resolveLogoPath(id);
+                const chip = document.createElement('div');
+                chip.className = 'logo-chip';
+                if (path) {
+                    const img = document.createElement('img');
+                    img.src = path;
+                    img.alt = id;
+                    chip.appendChild(img);
+                } else {
+                    chip.textContent = id || 'ロゴ未設定';
+                }
+                logoHints.appendChild(chip);
+            });
+        }
+
+        function renderOptions(optionsList) {
+            optionsArea.innerHTML = '';
+            optionsList.forEach((label, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.textContent = label;
+                btn.dataset.index = String(idx);
+                optionsArea.appendChild(btn);
+            });
+        }
+
+        function renderQuestion() {
+            const q = quizData[currentIndex];
+            answered = false;
+            errorText.classList.add('hidden');
+            questionTitle.textContent = `問題 ${currentIndex + 1}: このメロディはどの駅？`;
+            statusText.textContent = `ステータス: 信号#${currentIndex + 1} 待機`;
+            factText.textContent = '';
+            audioEl.pause();
+            audioEl.currentTime = 0;
+            audioEl.src = q.audioUrl || '';
+            // audioMeta.textContent = q.audioUrl ? `音源: ${q.audioUrl}` : '音源未設定（後で挿入してください）'; // 移除 meta 显示
+            setProgress();
+            renderLogos(q.interchangeLogos);
+            // 默认隐藏提示
+            if (logoHints) logoHints.classList.add('hidden');
+
+            // 面板入场动效
+            if (questionPanel) {
+                questionPanel.classList.remove('fade-in');
+                void questionPanel.offsetWidth;
+                questionPanel.classList.add('fade-in');
+            }
+
+            // 打乱选项，确保正确答案不固定在第一个
+            const originalOptions = q.options || [];
+            const correctOption = originalOptions[q.answerIndex];
+            const shuffled = [...originalOptions].sort(() => Math.random() - 0.5);
+            currentOptions = shuffled;
+            currentAnswerIndex = shuffled.indexOf(correctOption);
+            renderOptions(shuffled);
+            
+            // 切换面板显示
+            if (questionPanel) questionPanel.classList.remove('hidden');
+            if (introPanel) introPanel.classList.add('hidden');
+            if (factPanel) factPanel.classList.add('hidden');
+            if (uploadPanel) uploadPanel.classList.add('hidden');
+            setPlayingUI(false);
+        }
+
+        // 评价语配置
+        const feedbackMessages = [
+            { min: 0, max: 3, text: "信号強度微弱... まだノイズが多いみたい。<br>もう一度トライして、耳を澄ましてみて！" },
+            { min: 4, max: 6, text: "感度良好！<br>半分くらいの信号は解析できたね。<br>新宿マスターまであと少し！" },
+            { min: 7, max: 8, text: "素晴らしい解析能力！<br>ほとんどのメロディを聞き分けられているよ。<br>パーフェクトまであと一歩！" },
+            { min: 9, max: 9, text: "【解析率100%】<br>完璧だ！君こそが新宿のメロディマスター。<br>母星もこの成果に驚いているはず！" }
+        ];
+
+        function getFeedback(score) {
+            return feedbackMessages.find(m => score >= m.min && score <= m.max).text;
+        }
+
+        // showResult 改为处理 UI 切换，isBackFromForm 表示是从表单返回，不需要重新计算
+        function showResult(isClear, isBackFromForm = false) {
+            // 隐藏其他面板
+            if (questionPanel) questionPanel.classList.add('hidden');
+            if (factPanel) factPanel.classList.add('hidden');
+            // 直接使用结果区域，不再显示上传
+            const resultView = document.getElementById('resultView');
+            if (resultView) resultView.classList.remove('hidden');
+
+            const formView = null; // 已移除上传表单
+
+            // 正常结算逻辑
+            resultView.classList.remove('hidden');
+
+            // 计算分数
+            // 注意：isClear=true 表示全部答对通关；isClear=false 表示中途失败
+            // 如果中途失败，得分就是 currentIndex（因为当前题错了，没得分）
+            // 总题数 9
+            let finalScore = isClear ? 9 : currentIndex;
+            const feedback = getFeedback(finalScore);
+            const isPerfect = finalScore === 9;
+
+            resultView.classList.remove('fade-in');
+            void resultView.offsetWidth;
+            resultView.classList.add('fade-in');
+
+            resultView.innerHTML = `
+                <h2 style="font-size:28px; margin-bottom:10px; color:#fff; text-shadow: 0 0 20px rgba(72,198,255,0.4);">
+                    ${isPerfect ? 'MISSION COMPLETE!' : 'ANALYSIS FINISHED'}
+                </h2>
+                
+                <div style="font-size:22px; font-weight:700; color:#cbd5f5; margin-bottom:12px;">
+                    解析スコア
+                </div>
+                <div class="score-wrap">
+                    <div class="score-number">
+                        <span class="score-pop">${finalScore}</span> <span class="score-denom">/ 9</span>
+                    </div>
+                </div>
+
+                <p style="color:#e0f2fe; line-height:1.8; margin-bottom:32px; max-width:400px; text-align:center;">
+                    ${feedback}
+                </p>
+                
+                <div style="display:flex; flex-direction:column; gap:12px; width:100%; max-width:300px;">
+                    <button onclick="restartGame()" class="btn btn-primary" style="width:100%;">
+                        もう一度挑戦する 🔄
+                    </button>
+                </div>
+            `;
+        }
+        function showUploadForm() {}
+
+        function restartGame() {
+            // 重置状态
+            currentIndex = 0;
+            answered = false;
+            currentOptions = [];
+            currentAnswerIndex = 0;
+            audioEl.pause();
+            audioEl.currentTime = 0;
+            setPlayingUI(false);
+
+            // 重置 UI
+            if (uploadPanel) uploadPanel.classList.add('hidden');
+            if (factPanel) factPanel.classList.add('hidden');
+            if (questionPanel) questionPanel.classList.add('hidden');
+            if (introPanel) introPanel.classList.remove('hidden');
+
+            const resultView = document.getElementById('resultView');
+            if (resultView) resultView.innerHTML = '';
+
+            // 重置进度显示
+            setProgress();
+        }
+
+        function renderPlayIcon(isPlaying) {
+            if (!playToggleBtn) return;
+            if (isPlaying) {
+                playToggleBtn.innerHTML = `
+                    <svg class="note-icon" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="20" y="16" width="8" height="32" rx="2" ry="2"></rect>
+                        <rect x="36" y="16" width="8" height="32" rx="2" ry="2"></rect>
+                    </svg>
+                `;
+            } else {
+                playToggleBtn.innerHTML = `
+                    <svg class="note-icon" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M20 16v32l28-16z"></path>
+                    </svg>
+                `;
+            }
+        }
+
+        function setPlayingUI(isPlaying) {
+            if (isPlaying) {
+                audioWrapper?.classList.add('audio-playing');
+            } else {
+                audioWrapper?.classList.remove('audio-playing');
+            }
+            renderPlayIcon(isPlaying);
+        }
+
+        function handleAnswer(idx) {
+            if (answered) return;
+            const q = quizData[currentIndex];
+            answered = true;
+            const isCorrect = Number(idx) === currentAnswerIndex;
+            
+            optionsArea.querySelectorAll('.option-btn').forEach(btn => {
+                const bIdx = Number(btn.dataset.index);
+                if (bIdx === currentAnswerIndex) btn.classList.add('correct');
+                else if (bIdx === Number(idx)) btn.classList.add('wrong');
+            });
+
+            if (!isCorrect) {
+                // 答错逻辑变更：直接结束
+                statusText.textContent = '信号解析失敗...';
+                audioEl.pause();
+                
+                // 延迟一点点跳转，让用户看到选错了
+                setTimeout(() => {
+                    showResult(false);
+                }, 1000);
+                return;
+            }
+
+            // 答对逻辑不变
+            statusText.textContent = '信号解析成功: 正解！';
+            errorText.classList.add('hidden');
+            // 允许 <br> 生效，使用 innerHTML；题库内容为受控文本
+            factText.innerHTML = q.fact || '豆知識未設定。後で追記してください。';
+            if (questionPanel) questionPanel.classList.add('hidden');
+            if (factPanel) factPanel.classList.remove('hidden');
+            audioEl.pause();
+            setPlayingUI(false);
+        }
+
+        function goNext() {
+            if (currentIndex < quizData.length - 1) {
+                currentIndex += 1;
+                renderQuestion();
+            } else {
+                // 全部通关
+                showResult(true);
+            }
+        }
+
+        function setupEvents() {
+            if (startBtn) {
+                startBtn.onclick = () => { // 改用 onclick 确保覆盖
+                    console.log('Mission Start!');
+                    currentIndex = 0;
+                    renderQuestion();
+                };
+            }
+            optionsArea.addEventListener('click', (e) => {
+                const target = e.target;
+                if (target && target.classList.contains('option-btn')) {
+                    handleAnswer(target.dataset.index);
+                }
+            });
+
+            if (playToggleBtn) {
+                playToggleBtn.addEventListener('click', () => {
+                    if (!audioEl.src) {
+                        alert('音源が未設定です。後で音源URLを挿入してください。');
+                        return;
+                    }
+                    if (audioEl.paused) {
+                        audioEl.play();
+                        setPlayingUI(true);
+                        statusText.textContent = `信号#${currentIndex + 1} 再生中`;
+                    } else {
+                        audioEl.pause();
+                        audioEl.currentTime = 0;
+                        setPlayingUI(false);
+                        statusText.textContent = `信号#${currentIndex + 1} 停止`;
+                    }
+                });
+            }
+
+            audioEl.addEventListener('ended', () => {
+                setPlayingUI(false);
+                statusText.textContent = `信号#${currentIndex + 1} 停止`;
+            });
+
+            if (hintBtn && logoHints) {
+                hintBtn.addEventListener('click', () => {
+                    const hidden = logoHints.classList.contains('hidden');
+                    if (hidden) {
+                        logoHints.classList.remove('hidden');
+                        hintBtn.textContent = '👁‍🗨';
+                        hintBtn.title = 'ヒントを隠す';
+                    } else {
+                        logoHints.classList.add('hidden');
+                        hintBtn.textContent = '👁';
+                        hintBtn.title = 'ヒントを見る';
+                    }
+                });
+            }
+
+            nextBtn.addEventListener('click', goNext);
+        }
+
+        function setupUploadUI() {}
+
+        // 打开弹窗函数 / ポップアップを開く関数
+        function openModal() {
+            if (modal) {
+                modal.classList.add('active');
+                // 重置到 Intro 界面
+                if (introPanel) introPanel.classList.remove('hidden');
+                if (questionPanel) questionPanel.classList.add('hidden');
+                if (factPanel) factPanel.classList.add('hidden');
+                currentIndex = 0; // 重置进度
+            }
+        }
+
+        // 关闭弹窗函数 / ポップアップを閉じる函数
+        function closeModal() {
+            if (modal) {
+                modal.classList.remove('active');
+                audioEl.pause();
+            }
+        }
+
+        // 初期化
+        setupEvents();
+        setupUploadUI();
+        setProgress();
+        if (uploadPanel) uploadPanel.classList.add('hidden');
+
+        // (可选) 按 ESC 键关闭 / (オプション) ESCキーで閉じる
+        document.addEventListener('keydown', function(event) {
+            if (event.key === "Escape") {
+                closeModal();
+            }
+        });
+    </script>
+
+</body>
+</html>

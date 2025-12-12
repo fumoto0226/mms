@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Club Modal (Cyberpunk Theme)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { 
+            margin: 0; 
+            font-family: 'Noto Sans JP', sans-serif; 
+            overflow: hidden; 
+            background-color: #000; 
+        }
+
+/* -----------------------------------------------------------
+            1. モーダルオーバーレイ (背景の黒い部分とエフェクト)
+        ----------------------------------------------------------- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            /* **修正:** 背景を画像に変更し、画像を暗くする */
+            background-color: rgba(0, 0, 0, 0.85); /* 既存のオーバーレイを維持 */
+            backdrop-filter: blur(3px); 
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        /* **修正:** 背景画像と暗いオーバーレイ、ネオンのエフェクトを付与 */
+        .modal-overlay::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            
+            /* **変更点:** 背景画像の設定 */
+            background-color: #111;
+            background-size: cover, 80px 80px, 80px 80px, cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            
+            /* 背景画像が暗すぎるため、明るさを少し上げる */
+            filter: brightness(1.2); 
+            opacity: 1; /* 不透明度を1に戻す */
+            pointer-events: none;
+        }
+        
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+/* -----------------------------------------------------------
+            2. モーダルコンテンツ (カード本体)
+        ----------------------------------------------------------- */
+/* -----------------------------------------------------------
+2. モーダルコンテンツ (カード本体)
+----------------------------------------------------------- */
+        .modal-content {
+            background: 
+                linear-gradient(rgba(10, 0, 15, 0.4)), 
+                url('images/back-ground.png'); 
+
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+
+            color: #fff;
+            width: 100%;
+            max-width: 480px; /* モックアップに合わせた幅 */
+            max-height: 90vh;
+            border-radius: 18px; /* 角丸を少し大きく */
+
+/* ネオンの光る影と枠線 */
+            box-shadow: 
+                0 0 15px rgba(255, 0, 255, 0.8),
+                0 0 30px rgba(0, 255, 255, 0.5);
+            border: 2px solid #ff00ff;
+            position: relative;
+
+/* **変更点:** 水平方向のスクロールを隠す */
+            overflow-y: auto; 
+            overflow-x: hidden; 
+
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px 15px 30px; /* 上部のパディングを減らす */
+
+/* 画面外からのアニメーション */
+            transform: scale(0.95) translateY(20px);
+            opacity: 0;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+    }
+
+        .modal-overlay.active .modal-content {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+        }
+        /* -----------------------------------------------------------
+            3. 閉じるボタン (X)
+        ----------------------------------------------------------- */
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            color: #fff;
+            font-size: 20px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            z-index: 10;
+            transition: all 0.2s;
+        }
+        .close-btn:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+            transform: rotate(90deg);
+        }
+
+        /* -----------------------------------------------------------
+            4. 画像スライダーとボタン
+        ----------------------------------------------------------- */
+        .slider-wrapper {
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 8px; /* ボタンと画像の間のスペースを調整 */
+            margin-top: 15px; 
+            margin-bottom: 20px;
+            width: 100%;
+        }
+
+        .image-container {
+            width: 80%; /* 幅を調整 */
+            max-width: 350px; 
+            height: 200px; /* モックアップに合わせた高さ */
+            border-radius: 6px;
+            overflow: hidden; 
+            position: relative; 
+            flex-shrink: 0; 
+            /* 画像のネオン枠線 */
+            box-shadow: 0 0 10px rgba(255, 0, 255, 0.7);
+            border: 2px solid rgba(255, 0, 255, 0.5);
+        }
+        .slider-track {
+            display: flex;
+            width: 200%; /* 2枚の画像（100% * 2）を保持 */
+            height: 100%;
+            transition: transform 0.3s ease-out; /* スライドアニメーション */
+        }
+        
+        .slider-track img {
+            /* 1枚あたりの幅をコンテナのサイズに合わせる */
+            width: 50%; 
+            height: 100%;
+            object-fit: cover;
+            flex-shrink: 0;
+            /* **修正:** スライダー画像のトランジションをトラックに移動したので削除 */
+            transition: none; 
+        }
+        /* .image-container img {
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            display: block;
+            /* スライダー画像用のトランジション */
+            /* transition: opacity 0.2s ease, transform 0.2s ease; */
+        /* }  */
+
+        .slider-btn {
+            background: rgba(255, 0, 255, 0.1); /* 紫の半透明 */
+            border: 2px solid #ff00ff; /* ネオンマゼンタの枠線 */
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #ff00ff; /* ネオンマゼンタ */
+            /* **変更点:** モックアップに合わせて左/右の矢印の形 */
+            box-shadow: 0 0 8px rgba(255, 0, 255, 0.5);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 0;
+            padding-bottom: 3px; /* 縦方向の微調整 */
+        }
+        .slider-btn:hover {
+            background: rgba(255, 0, 255, 0.3);
+            color: #fff;
+            transform: scale(1.1);
+        }
+
+        /* -----------------------------------------------------------
+            5. テキストと評価エリア
+        ----------------------------------------------------------- */
+        .content-area {
+            text-align: center; 
+            width: 100%;
+            padding: 0 10px;
+        }
+        
+        /* タイトル */
+        .place-title {
+            font-size: 20px; 
+            color: #ff00ff; /* ネオンマゼンタ */
+            margin-bottom: 15px; 
+            font-weight: 700; 
+            text-shadow: 0 0 8px #ff00ff;
+        }
+        
+        /* 説明文 */
+        .place-description {
+            color: #ccc; 
+            line-height: 1.6; 
+            font-size: 14px; 
+            margin: 15px auto;
+            max-width: 400px;
+            /* 枠線で区切る */
+            border-top: 1px dashed rgba(255, 0, 255, 0.3);
+            border-bottom: 1px dashed rgba(255, 0, 255, 0.3);
+            padding: 15px 0;
+        }
+        
+        /* 評価エリア */
+        .rating-area {
+            margin-top: 10px;
+            /* **変更点:** 評価エリアのスタイル */
+            padding: 8px 15px;
+            background: rgba(0, 255, 255, 0.05); /* 薄いシアン背景 */
+            border-radius: 8px;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+        }
+        
+        .rating-text {
+            font-size: 14px; 
+            color: #00ffff; 
+            margin-bottom: 5px;
+            text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+        }
+        
+        .rating-stars {
+            font-size: 28px; 
+            color: #ffcc00; /* 星の色をゴールドに */
+            letter-spacing: 5px;
+            text-shadow: 0 0 10px #ffcc00;
+        }
+        
+        .rating-note {
+            font-size: 13px;
+            color: #aaa;
+            margin-top: 5px;
+        }
+
+        /* -----------------------------------------------------------
+            6. シミュレーション用スタイル (元のコードから残す)
+        ----------------------------------------------------------- */
+        .simulated-map {
+            width: 100vw;
+            height: 100vh;
+            background-color: #111; /* 地図の背景を暗めに */
+            position: relative;
+            /* 動作確認用のUI */
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+        }
+        .map-ui-search {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 15px;
+            border-radius: 8px;
+            color: #aaa;
+            font-size: 14px;
+        }
+        .map-pin {
+            cursor: pointer;
+            padding: 15px 30px; 
+            background: #ff00ff; 
+            color: #fff; 
+            border: none; 
+            border-radius: 5px; 
+            font-size: 16px; 
+            box-shadow: 0 0 10px #ff00ff;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="simulated-map">
+        <div class="map-ui-search">🔍 Search location...</div>
+        
+        <button class="map-pin" onclick="openModal()">Click Me (Open Modal)</button>
+    </div>
+
+
+    <div id="myModal" class="modal-overlay" onclick="closeModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            
+            <button class="close-btn" onclick="closeModal()" aria-label="Close">×</button>
+
+            <div class="content-area">
+                <div class="slider-wrapper">
+                    <button id="prevBtn" class="slider-btn" aria-label="Previous Image">&lt;</button>
+                    <div class="image-container">
+                        <div id="sliderTrack" class="slider-track">
+                            <img id="image1" src="images/01.jpeg" alt="クラブ T2のDJブース写真1">
+                            <img id="image2" src="images/02.jpeg" alt="クラブ T2のDJブース写真2">
+                        </div>
+                    </div>
+                    <button id="nextBtn" class="slider-btn" aria-label="Next Image">&gt;</button>
+                </div>
+                
+                <h2 class="place-title">
+                    クラブ / T2
+                </h2>
+                
+                <p class="place-description">
+                    夜の新宿で波打つビートの渦。<br>
+                    光と音が混ざる人間の祭典らしい。<br><br>
+                    
+                    ワタシは、DJを観察した。<br>
+                    重低音が心臓の代わりに鼓動する感覚、悪くない。
+                </p>
+                
+                <div class="rating-area">
+                    <div class="rating-text">地球人との交信度:</div>
+                    <div class="rating-stars">⭐⭐⭐</div>
+                    <div class="rating-note">（ノリはいいが言語は難解）</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+<script>
+    // DOM要素の取得
+    const modal = document.getElementById('myModal');
+    // 変更: sliderImageをsliderTrackに
+    const sliderTrack = document.getElementById('sliderTrack');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    
+    // 変更: 画像を01.jpegと02.jpegの2枚に限定
+    const images = ['01.jpeg', '02.jpeg']; 
+    let currentIndex = 0; // 0 (1枚目) または 1 (2枚目)
+
+    // モーダルを開く関数
+    function openModal() {
+        if (modal) {
+            // アニメーションを適用
+            const content = modal.querySelector('.modal-content');
+            content.style.transition = 'none'; 
+            content.style.transform = 'scale(0.95) translateY(20px)';
+            content.style.opacity = '0';
+
+            modal.style.opacity = '1';
+            modal.style.visibility = 'visible';
+            
+            // 初期表示（1枚目）に戻す
+            currentIndex = 0;
+            sliderTrack.style.transform = `translateX(0)`; // 1枚目
+            
+            setTimeout(() => {
+                content.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease';
+                content.style.transform = 'scale(1) translateY(0)';
+                content.style.opacity = '1';
+            }, 10);
+        }
+    }
+
+    // モーダルを閉じる関数
+    function closeModal() {
+        if (modal) {
+            const content = modal.querySelector('.modal-content');
+            content.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+            content.style.transform = 'scale(0.95) translateY(20px)';
+            content.style.opacity = '0';
+            
+            modal.style.transition = 'opacity 0.3s ease, visibility 0.3s ease';
+            
+            setTimeout(() => {
+                modal.style.opacity = '0';
+                modal.style.visibility = 'hidden';
+            }, 300);
+        }
+    }
+
+    // 変更: 画像スライダーの更新ロジック (トラックを移動させる)
+    function updateImage(direction) {
+        
+        if (direction === 'next') {
+            currentIndex = (currentIndex + 1) % images.length;
+        } else {
+            currentIndex = (currentIndex - 1 + images.length) % images.length;
+        }
+        
+        // トラックを移動させる（currentIndexが1なら -50%移動）
+        const offset = currentIndex * -50;
+        sliderTrack.style.transform = `translateX(${offset}%)`;
+    }
+
+    // イベントリスナーの設定
+    prevBtn.addEventListener('click', function() {
+        updateImage('prev');
+    });
+
+    nextBtn.addEventListener('click', function() {
+        updateImage('next');
+    });
+
+    // ESCキーで閉じる
+    document.addEventListener('keydown', function(event) {
+        if (event.key === "Escape" && modal.style.visibility === 'visible') {
+            closeModal();
+        }
+    });
+</script>
+
+
+</body>
+</html>

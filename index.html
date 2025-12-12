@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>mm's新宿ザイリュウログ</title>
+<link rel="icon" href="img/web-logo.svg" type="image/svg+xml" />
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet" />
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #d8d8d8;
+  }
+
+  /* 加载界面样式 */
+  #loading-screen {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #d8d8d8;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    transition: opacity 0.4s ease;
+  }
+
+  #loading-screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .loader-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    padding: 32px 28px;
+  }
+
+  .loading-gif {
+    width: 360px;
+    height: auto;
+  }
+
+  .progress-container {
+    width: 260px;
+    height: 10px;
+    background: #ededed;
+    border: 1px solid #b5b5b5;
+    display: block;
+    overflow: hidden;
+  }
+
+  .progress-bar {
+    width: 0%;
+    height: 100%;
+    background: #2d2d2d;
+    transition: width 0.25s ease-out;
+  }
+
+  .loading-text {
+    color: #111;
+    font-size: 14px;
+    letter-spacing: 0.05em;
+    font-family: 'DotGothic16', 'Noto Sans JP', sans-serif;
+  }
+
+  #container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* —— 两层背景：与网格同一缩放逻辑 —— */
+  .bg-layer {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    aspect-ratio: calc(23 / 12);
+    height: 100vh;
+    transform: translate(-50%, -50%);
+    background-size: 100% 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+    transition: opacity 220ms ease;
+    will-change: opacity;
+    pointer-events: none;
+  }
+  @media (min-aspect-ratio: 23/12) {
+    .bg-layer { width: 100vw; height: auto; }
+  }
+  #bgA { z-index: 0; opacity: 1; }
+  #bgB { z-index: 1; opacity: 0; }
+
+  /* —— 网格：同样比例 + 外圈禁用 —— */
+  #grid {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    aspect-ratio: calc(23 / 12);
+    height: 100vh;
+    transform: translate(-50%, -50%);
+    display: grid;
+    grid-template-columns: repeat(23, 1fr);
+    grid-template-rows: repeat(12, 1fr);
+    z-index: 2;
+  }
+  @media (min-aspect-ratio: 23/12) {
+    #grid { width: 100vw; height: auto; }
+  }
+  #grid div {
+    border: none; /* 隐藏网格线 */
+    /* 去掉 hover 高亮 */
+  }
+  #grid div.disabled {
+    background-color: transparent;
+    pointer-events: none;
+  }
+
+  /* AI识别框样式 */
+  .ai-detection-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+    display: none; /* 隐藏AI识别框 */
+  }
+
+  .ai-region {
+    position: absolute;
+    pointer-events: none;
+  }
+
+  /* —— UI 覆盖层（贴在背景上的UI） —— */
+  #uiOverlay {
+    position: absolute;
+    left: 0; top: 0;
+    pointer-events: none; /* 默认不拦截事件 */
+    z-index: 20; /* 高于网格与AI识别框 */
+  }
+  
+  #uiOverlay .menu {
+    pointer-events: auto; /* 菜单可以接收鼠标事件 */
+  }
+  #uiOverlay img#logo {
+    position: absolute;
+    width: 260px; /* 实际尺寸由JS按比例缩放 */
+  }
+  #uiOverlay .menu div {
+    position: absolute;
+    width: 160px;
+    padding: 8px 8px 8px 8px;
+    background: #000;
+    color: #fff;
+    font-weight: bold;
+    text-align: center;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+    border-radius: 4px; 
+    user-select: none;
+  }
+  
+  #uiOverlay .menu div:hover {
+    background: #333;
+    border-color: #fff;
+    transform: scale(1.05);
+  }
+  
+  #uiOverlay .menu div:active {
+    background: #555;
+    transform: scale(0.95);
+  }
+  
+  #uiOverlay .menu div.clicked {
+    background: #666;
+    border-color: #00ff88;
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+  }
+  #uiOverlay #version {
+    position: absolute;
+    font-size: 12px;
+    color: #fff;
+    opacity: 0.8;
+    font-weight: 500; /* 增加字重，从默认变为半粗体 */
+  }
+
+  .ai-box {
+    position: absolute;
+    border: 2px solid var(--region-color);
+    background: transparent;
+    box-sizing: border-box;
+    transform-origin: center;
+    opacity: 0;
+    animation: expandBox 0.8s ease-out forwards;
+  }
+
+  .ai-label {
+    position: absolute;
+    left: -2px;
+    top: -1.5em;
+    padding: 2px 6px;
+    background: var(--region-color);
+    color: rgb(0, 0, 0);
+    font-weight: bold;
+    font-size: 12px;
+    font-family: Arial, sans-serif;
+    border-radius: 2px;
+    opacity: 0;
+    animation: showLabel 1s ease-out 0.8s forwards;
+    white-space: nowrap;
+    transform: translateY(-5px);
+  }
+
+  .ai-label-text {
+    display: inline-block;
+    min-width: 1ch;
+  }
+
+  @keyframes expandBox {
+    from { 
+      transform: scale(0); 
+      opacity: 0; 
+    }
+    to { 
+      transform: scale(1); 
+      opacity: 1; 
+    }
+  }
+
+  @keyframes showLabel {
+    from { 
+      opacity: 0; 
+      transform: translateY(-5px);
+    }
+    to { 
+      opacity: 1; 
+      transform: translateY(0);
+    }
+  }
+
+  /* 识别框脉冲效果 - 简单的透明度变化 */
+  .ai-box {
+    animation: expandBox 0.8s ease-out forwards, pulse 2s ease-in-out infinite 0.8s;
+  }
+
+  @keyframes pulse {
+    0%, 100% { 
+      opacity: 1;
+    }
+    50% { 
+      opacity: 0.7;
+    }
+  }
+</style>
+</head>
+<body>
+  <!-- 加载界面 -->
+  <div id="loading-screen">
+    <div class="loader-content">
+      <img class="loading-gif" src="img/loading.gif" alt="loading" />
+      <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+      <div class="loading-text" id="loading-text">地球へ向かう準備中... 0%</div>
+    </div>
+  </div>
+
+  <!-- 主界面 -->
+  <div id="container" style="display: none;">
+    <div id="bgA" class="bg-layer" style="background-image:url('home-webp/0-0.webp')"></div>
+    <div id="bgB" class="bg-layer" style="background-image:url('home-webp/0-0.webp')"></div>
+    <div id="grid"></div>
+    <!-- AI识别框容器 -->
+    <div id="ai-detection-container" class="ai-detection-container"></div>
+    <!-- 背景贴附UI容器 -->
+    <div id="uiOverlay">
+      <img id="logo" src="img/logo01.svg" alt="logo">
+      <div class="menu">
+        <div>記録</div>
+        <div>アルバム</div>
+        <div>設定</div>
+      </div>
+      <div id="version">ver.1.0.0.20251212-beta</div>
+    </div>
+  </div>
+
+<script>
+const grid = document.getElementById('grid');
+const bgA  = document.getElementById('bgA');
+const bgB  = document.getElementById('bgB');
+const loadingScreen = document.getElementById('loading-screen');
+const progressBar = document.getElementById('progress-bar');
+const loadingText = document.getElementById('loading-text');
+const container = document.getElementById('container');
+const aiDetectionContainer = document.getElementById('ai-detection-container');
+const uiOverlay = document.getElementById('uiOverlay');
+
+let showing = bgA;         // 当前可见层
+let hidden  = bgB;         // 当前隐藏层
+let requestSeq = 0;        // 悬停请求序号（防竞态）
+const cache = new Map();   // 图片缓存：url -> Image对象
+const imageCache = new Map(); // 持久化图片缓存：url -> Image对象
+
+// 加载状态
+let totalImages = 0;
+let loadedImages = 0;
+let isPreloading = true;
+
+const loadingMessages = [
+  '地球へ向かう準備中...',
+  'むかしむかし……宇宙のどっかに mm 星っていう、特に特徴のない星があったんだ。',
+  'そこに mm 星人がいた。見た目は普通。中身も普通。強いて言えばヒマ。',
+  'ある日、隊長が突然言った。「地球行くわ。」理由は特にない。',
+  'みんな「へぇ〜」って言いながら、とりあえず荷物つめた。',
+  'まずはおやつ確保。宇宙よりおやつの方が大事という文化。',
+  '地球語の練習もした。「コンニチハ…」「シンジュク…」。全部カタカナ。',
+  '宇宙船のナビは相変わらずやる気がない。目的地を入力しても黙る時がある。',
+  'でも mm 星人は気にしない。「まあ、どっかには着くっしょ」で片付けた。',
+  '発射ボタン押したら一応飛んだ。たまに飛ばない日もある。',
+  '宇宙の道中、隕石が飛んできたりブラックホールが吸ってきたりしたけど、特にリアクションなし。',
+  'おやつが浮いた時だけ全員ちょっと焦った。「それは困る。」',
+  'なんだかんだで地球が見えてきた。青い。以上。',
+  '着陸前に“地球人にバレないモード”起動したら、全員なぜか緑色になった。',
+  '「これ、バレるやつじゃね？」',
+  '「まあ…地球人もわりと変な色してるし、許容範囲っしょ。」',
+  '宇宙船が勝手に新宿方向へ曲がっていった。ナビの癖が強い。',
+  'そのまま静かに着陸。特にドラマもなし。',
+  '一応、調査開始。目的は“なんとなく”。',
+  '地球人が気づく前に mm 星人たちは周囲を観察開始。',
+  '「ふぅん……地球、わりと普通。」っていうのが初日の感想だった。',
+  'え、まだ読み込めてないんだ。',
+  '地球のネット、こんなにスローだったっけ？',
+  'こっちは光より速く移動できるのに、ページひとつ開かないの笑うんだけど。',
+  'もしかして、あなたの回線……宇宙船より古くない？',
+  'ていうか、正直こっちがもう待ちきれないんだけど。',
+  'mm 星に帰って一周しても、まだロード終わってなさそうだし。',
+  'まあいいや。ここまで来たら、もうあなたの根性を見届けるしかないね。',
+  '「そんなに時間ありそうだし、mm星人のこと10個くらい聞いていいよね？」',
+  'Q：宇宙人が一番びっくりする地球の食べ物は？',
+  'A：宇宙イモ（ウチュウいも）→ 宇宙にもあると思ったから。',
+  'Q：地球で宇宙人が絶対に負けるスポーツは？',
+  'A：かくれんぼ。すでに見た目でバレるから。',
+  'Q：宇宙人が好きな天気は？',
+  'A：流星雨。無料ショーだから。',
+  'Q：地球人が宇宙人に絶対勝てないものは？',
+  'A：まばたきの回数。宇宙人は目が乾かない。',
+  'Q：宇宙人が地球で必ず買うものは？',
+  'A：帰りの電車の切符（なぜか Suica が好き）。',
+  'Q：宇宙人の嫌いな曜日は？',
+  'A：ムーンデー（Monday）。月はもう見飽きた。',
+  'Q：宇宙人がホテルで絶対言うセリフは？',
+  'A：「重力がやさしいですね〜」',
+  'Q：宇宙人が使うスマホのOSは？',
+  'A：UOS（宇宙オペレーティングシステム）',
+  'Q：地球人と宇宙人が仲良くできる理由は？',
+  'A：どちらも夜食をやめられないから。',
+  'Q：宇宙人が日本で最初に覚える言葉は？',
+  'A：「おかわり！」',
+  'え？こんなに待ってるのに、まだページが読み込まれてないの？',
+  'ほんとにあなたのネット、大丈夫？',
+  'あきらめないでよ、こっちも地球にデータ送信してるんだから…',
+  'しょうがないなぁ。',
+  'そんなにこのサイトを見たいの？',
+  'じゃあ、ひとつ秘密を教えてあげるよ。',
+  '実はね……',
+  'ページの左上にある「×」を押すと、読み込み完了してなくても入れるんだよ。',
+  'でもね、それをすると演出がめちゃくちゃ残念な感じになるよ。',
+  'もしそれでも待つ気があるなら……',
+  'じゃあ、ひとつお話をしてあげるね。',
+  '从前有座山……',
+  '山里有座庙……',
+  '庙里有个老和尚在给小和尚讲故事……',
+  '讲的什么故事？',
+  '从前有座山……',
+  '山里有座庙……',
+  '庙里有个老和尚在给小和尚讲故事……',
+  'えっと…さっき何の話をしてたっけ？',
+  'あ、そうだ。じゃあ日本語でもう一回言うね。',
+  '昔々、あるところに山がありました……',
+  '山の中にはお寺がありました……',
+  'そのお寺には、おじいさんのお坊さんがいて、小さなお坊さんにお話をしていました……',
+  '小さなお坊さんが聞きました。「どんなお話ですか？」',
+  '昔々、あるところに山がありました……',
+  '山の中にはお寺がありました……',
+  'そのお寺には、おじいさんのお坊さんがいて、小さなお坊さんにお話をしていました……'
+];
+
+let loadingMessageIndex = 0;
+let loadingMessageTimer = null;
+
+/** 渲染当前加载提示文案 */
+function renderLoadingText(progress) {
+  const safeProgress = Number.isFinite(progress) ? progress : 0;
+  loadingText.textContent = `${loadingMessages[loadingMessageIndex]} ${safeProgress}%`;
+}
+
+/** 启动加载文案轮播（每5秒切换一条） */
+function startLoadingMessageRotation() {
+  renderLoadingText(0);
+  loadingMessageTimer = setInterval(() => {
+    loadingMessageIndex = (loadingMessageIndex + 1) % loadingMessages.length;
+    const safeTotal = Math.max(totalImages, 1);
+    const progress = Math.round((loadedImages / safeTotal) * 100);
+    renderLoadingText(progress);
+  }, 5000);
+}
+
+/** 停止轮播，防止组件卸载后仍在运行 */
+function stopLoadingMessageRotation() {
+  if (loadingMessageTimer) {
+    clearInterval(loadingMessageTimer);
+    loadingMessageTimer = null;
+  }
+}
+
+/** 预加载图片，确保切换前一定已就绪 */
+function preload(url) {
+  // 如果图片已经在持久化缓存中，直接返回
+  if (imageCache.has(url)) {
+    return Promise.resolve(imageCache.get(url));
+  }
+  
+  // 如果正在加载中，返回现有的Promise
+  if (cache.has(url)) {
+    return cache.get(url);
+  }
+  
+  const p = new Promise((resolve, reject) => {
+    const img = new Image();
+    img.src = url;
+    
+    img.onload = () => {
+      // 将图片对象保存到持久化缓存
+      imageCache.set(url, img);
+      cache.delete(url); // 从临时缓存中删除
+      
+      if (isPreloading) {
+        loadedImages++;
+        updateProgress();
+      }
+      resolve(img);
+    };
+    
+    img.onerror = () => {
+      cache.delete(url);
+      if (isPreloading) {
+        loadedImages++;
+        updateProgress();
+      }
+      reject(new Error(`Failed to load ${url}`));
+    };
+    
+    // 尝试更可靠的 decode（更少闪烁）
+    if ('decode' in img) {
+      img.decode().catch(() => {
+        // decode失败时依赖onload事件
+      });
+    }
+  });
+  
+  cache.set(url, p);
+  return p;
+}
+
+/** 更新加载进度 */
+function updateProgress() {
+  const safeTotal = Math.max(totalImages, 1);
+  const progress = Math.round((loadedImages / safeTotal) * 100);
+  progressBar.style.width = progress + '%';
+  renderLoadingText(progress);
+  
+  if (loadedImages >= totalImages) {
+    setTimeout(() => {
+      showMainInterface();
+    }, 500); // 延迟500ms显示主界面
+  }
+}
+
+/** 显示主界面 */
+function showMainInterface() {
+  loadingScreen.classList.add('hidden');
+  container.style.display = 'block';
+  isPreloading = false;
+  stopLoadingMessageRotation();
+  
+  // 确保初始背景已设置
+  bgA.style.backgroundImage = 'url(home-webp/0-0.webp)';
+  bgB.style.backgroundImage = 'url(home-webp/0-0.webp)';
+  
+  // 输出缓存状态信息
+  console.log(`图片缓存完成: ${imageCache.size} 张图片已缓存`);
+}
+
+/** 验证缓存状态 */
+function validateCache() {
+  console.log(`当前缓存状态: ${imageCache.size} 张图片`);
+  console.log(`临时缓存状态: ${cache.size} 个加载中`);
+}
+
+// 启动加载文案轮播
+startLoadingMessageRotation();
+
+/** 切换背景：仅在新图完全加载后才淡入，并且只响应最后一次请求 */
+async function switchTo(url) {
+  const mySeq = ++requestSeq;
+  try {
+    // 确保图片已加载并缓存
+    const img = await preload(url);
+    
+    // 期间如果又来了更新请求，就放弃这次切换
+    if (mySeq !== requestSeq) return;
+
+    // 验证图片对象是否有效
+    if (!img || !img.complete) {
+      console.warn('Image not ready:', url);
+      return;
+    }
+
+    // 先把新图放到隐藏层，但仍保持隐藏层 opacity=0
+    hidden.style.backgroundImage = `url(${url})`;
+    
+    // 强制重绘，确保图片已渲染
+    hidden.offsetHeight;
+
+    // 再开始交叉淡入（旧图始终可见直到此刻）
+    hidden.style.opacity = '1';
+    showing.style.opacity = '0';
+
+    // 监听一次过渡结束后交换角色
+    const done = new Promise(res => {
+      const handler = () => {
+        hidden.removeEventListener('transitionend', handler);
+        res();
+      };
+      hidden.addEventListener('transitionend', handler);
+    });
+    await done;
+
+    // 交换层引用，确保下一次切换仍然平滑
+    const tmp = showing; showing = hidden; hidden = tmp;
+  } catch (e) {
+    // 加载失败时保持当前画面不变（不闪黑）
+    console.warn('Image load failed:', url, e);
+  }
+}
+
+// —— UI 覆盖层布局（与背景一致的 aspect-fill 逻辑） ——
+const uiBaseWidth = 1920;
+const uiBaseHeight = 960;
+function layoutUI() {
+  if (!uiOverlay) return;
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  const scale = Math.max(W / uiBaseWidth, H / uiBaseHeight);
+  const viewW = uiBaseWidth * scale;
+  const viewH = uiBaseHeight * scale;
+  const offsetX = (W - viewW) / 2;
+  const offsetY = (H - viewH) / 2;
+
+  // 容器尺寸与位置
+  uiOverlay.style.width = `${viewW}px`;
+  uiOverlay.style.height = `${viewH}px`;
+  uiOverlay.style.left = `${offsetX}px`;
+  uiOverlay.style.top = `${offsetY}px`;
+
+  // logo
+  const logo = document.getElementById('logo');
+  if (logo) {
+    logo.style.left = `${950 * scale}px`;//位置
+    logo.style.top = `${60 * scale}px`;
+    logo.style.width = `${860 * scale}px`;//大小
+  }
+
+  // 菜单（黑底白字按钮）
+  const menuItems = uiOverlay.querySelectorAll('.menu div');
+  const baseY = 350; // 起始 y 坐标（基于 1920×960）
+  const step = 76;   // 每项间隔
+  const menuX = 1560; // 🎯 菜单位置 X 坐标（从 1650 改为 1500，往左移动 150px）
+  menuItems.forEach((m, i) => {
+    m.style.left = `${menuX * scale}px`; // 🎯 修改位置：往左移动
+    m.style.top = `${(baseY + i * step) * scale}px`;
+    m.style.width = `${160 * scale}px`;
+    m.style.fontSize = `${20 * scale}px`;
+  });
+
+  // 版本号
+  const version = document.getElementById('version');
+  if (version) {
+    version.style.left = `${1560 * scale}px`;
+    version.style.top = `${880 * scale}px`;
+    version.style.fontSize = `${16 * scale}px`;
+  }
+}
+
+
+// 离开网格恢复默认图（同样等加载好再切）
+grid.addEventListener('mouseleave', () => {
+  switchTo('home-webp/0-0.webp');
+  // 立即清理所有定时器和识别框
+  if (hideTimeout) {
+    clearTimeout(hideTimeout);
+    hideTimeout = null;
+  }
+  hideAllAIRegions();
+  currentAIRegion = null;
+  console.log('离开网格，隐藏所有识别框');
+});
+
+/** 生成所有需要预加载的图片URL */
+function generateAllImageUrls() {
+  const urls = ['home-webp/0-0.webp']; // 默认图片（首页背景）
+  
+  // 生成所有网格区域的图片URL
+  for (let r = 2; r <= 11; r++) {
+    for (let c = 2; c <= 22; c++) {
+      urls.push(`home-webp/${r}-${c}.webp`);
+    }
+  }
+  
+  return urls;
+}
+
+/** 开始预加载所有图片 */
+async function preloadAllImages() {
+  // 仅提前缓存首页背景图片（home 目录），不拉取其他页面资源
+  const allUrls = generateAllImageUrls();
+  totalImages = allUrls.length;
+  loadedImages = 0;
+  
+  loadingText.textContent = `搭載画像 ${totalImages} 枚をスキャン中...`;
+  
+  // 批量预加载全部首页背景
+  const preloadPromises = allUrls.map(url => 
+    preload(url).catch(error => {
+      console.warn(`Failed to load ${url}:`, error);
+    })
+  );
+  
+  // 等待所有图片加载完成
+  await Promise.allSettled(preloadPromises);
+}
+
+// 页面加载完成后开始预加载
+document.addEventListener('DOMContentLoaded', () => {
+  preloadAllImages();
+  // 初始化UI布局
+  layoutUI();
+  // 初始化菜单交互
+  setupMenuInteractions();
+  
+  // 定期验证缓存状态（调试用）
+  setInterval(() => {
+    if (!isPreloading) {
+      validateCache();
+    }
+  }, 10000); // 每10秒检查一次
+});
+
+// 窗口尺寸变化时，同步更新UI布局
+window.addEventListener('resize', layoutUI);
+
+// 菜单交互功能
+function setupMenuInteractions() {
+  const menuItems = document.querySelectorAll('#uiOverlay .menu div');
+  
+  menuItems.forEach((item, index) => {
+    // 添加点击事件
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // 移除其他菜单项的点击状态
+      menuItems.forEach(otherItem => {
+        otherItem.classList.remove('clicked');
+      });
+      
+      // 添加当前项的点击状态
+      item.classList.add('clicked');
+      
+      // 根据菜单项执行不同操作
+      const menuText = item.textContent.trim();
+      console.log(`点击了菜单项: ${menuText}`);
+      
+      // 这里可以添加具体的功能逻辑
+      switch(menuText) {
+        case '記録':
+          console.log('打开记录功能');
+          window.location.href = 'map.html';
+          break;
+        case 'アルバム':
+          console.log('打开相册功能');
+          window.location.href = 'album-ps.html';
+          break;
+        case '設定':
+          console.log('打开设置功能');
+          alert('フフフ…このボタンはただの飾りだよ〜〜🛸✨');
+          break;
+        default:
+          console.log('未知菜单项');
+      }
+      
+      // 2秒后移除点击状态
+      setTimeout(() => {
+        item.classList.remove('clicked');
+      }, 2000);
+    });
+    
+    // 添加鼠标进入事件
+    item.addEventListener('mouseenter', () => {
+      console.log(`鼠标悬浮: ${item.textContent.trim()}`);
+    });
+    
+    // 添加鼠标离开事件
+    item.addEventListener('mouseleave', () => {
+      // 可以在这里添加离开时的效果
+    });
+  });
+}
+
+// 添加全局缓存验证函数（调试用）
+window.validateImageCache = validateCache;
+window.getCacheSize = () => imageCache.size;
+
+// ========== AI识别框功能 ==========
+
+// 识别区域数据 - 简化的区域定义
+const regions = {
+    // 10-10区域的识别框
+    "10-10": [
+    {
+      x: 500, y: 300, width: 200, height: 150,
+      color: "#FF6B6B", name: "New Object"
+    },
+    {
+      x: 800, y: 400, width: 150, height: 100,
+      color: "#4ECDC4", name: "Another Object"
+    }
+  ],
+   // 11-15区域的识别框
+   "11-15": [
+    {
+      x: 300, y: 100, width: 200, height: 150,
+      color: "#00FF88", name: "Garden"
+    },
+    {
+      x: 600, y: 300, width: 180, height: 200,
+      color: "#FF6B6B", name: "Fountain"
+    }
+  ],
+  // 11-16区域的识别框
+  "11-16": [
+    {
+      x: 960, y: 20, width: 180, height: 440,
+      color: "#96FD00", name: "Yoyogi Building"
+    },
+    {
+      x: 200, y: 200, width: 160, height: 120,
+      color: "#F807FD", name: "Tree"
+    },
+    {
+      x: 400, y: 500, width: 260, height: 140,
+      color: "#F807FD", name: "Tree"
+    }
+  ],
+ 
+};
+
+// 全局状态跟踪
+let currentAIRegion = null;
+let hideTimeout = null;
+
+// 简化的区域处理函数
+function setupAIRegion(gridRow, gridCol) {
+  const regionKey = `${gridRow}-${gridCol}`;
+  
+  // 检查是否有该区域的识别框数据
+  if (regions[regionKey]) {
+    return {
+      isAIRegion: true,
+      regionKey: regionKey
+    };
+  }
+  
+  return { isAIRegion: false };
+}
+
+// 安全的显示识别框函数
+function safeShowAIRegions(regionKey) {
+  // 清除隐藏定时器
+  if (hideTimeout) {
+    clearTimeout(hideTimeout);
+    hideTimeout = null;
+  }
+  
+  // 如果已经是当前区域，不重复显示
+  if (currentAIRegion === regionKey) {
+    return;
+  }
+  
+  // 显示新区域的识别框
+  showAIRegions(regionKey);
+  currentAIRegion = regionKey;
+  console.log(`切换到区域 ${regionKey} 的识别框`);
+}
+
+// 安全的隐藏识别框函数
+function safeHideAIRegions() {
+  // 清除隐藏定时器
+  if (hideTimeout) {
+    clearTimeout(hideTimeout);
+  }
+  
+  // 延迟隐藏，给其他区域切换留时间
+  hideTimeout = setTimeout(() => {
+    hideAllAIRegions();
+    currentAIRegion = null;
+    console.log('隐藏所有识别框');
+  }, 150);
+}
+
+// 乱码字符集
+const garbledChars = "@#¥%*&!?$^~`|\\/<>{}[]()+=_-";
+
+/**
+ * 生成随机乱码文字
+ * @param {string} targetText 目标文字
+ * @param {number} length 乱码长度
+ * @returns {string} 乱码文字
+ */
+function generateGarbledText(targetText, length) {
+  let garbled = '';
+  for (let i = 0; i < length; i++) {
+    garbled += garbledChars[Math.floor(Math.random() * garbledChars.length)];
+  }
+  return garbled;
+}
+
+/**
+ * 文字从乱码变为正确文字的动画
+ * @param {HTMLElement} textElement 文字元素
+ * @param {string} targetText 目标文字
+ * @param {number} duration 动画持续时间（毫秒）
+ */
+function animateTextReveal(textElement, targetText, duration = 1000) {
+  const textLength = targetText.length;
+  const interval = duration / (textLength * 3); // 每个字符刷新3次
+  
+  let currentIndex = 0;
+  let animationFrame = 0;
+  
+  const animate = () => {
+    if (currentIndex < textLength) {
+      // 生成当前进度的乱码文字
+      const garbledLength = Math.max(1, textLength - currentIndex);
+      const garbledText = generateGarbledText(targetText, garbledLength);
+      const revealedText = targetText.substring(0, currentIndex);
+      
+      textElement.textContent = revealedText + garbledText;
+      
+      // 每3帧更新一次字符
+      if (animationFrame % 3 === 0) {
+        currentIndex++;
+      }
+      animationFrame++;
+      
+      requestAnimationFrame(animate);
+    } else {
+      // 动画结束，显示最终文字
+      textElement.textContent = targetText;
+    }
+  };
+  
+  animate();
+}
+
+
+/**
+ * 创建AI识别框
+ * @param {Object} region 区域数据
+ * @param {number} delay 延迟时间（毫秒）
+ */
+function createAIRegion(region, delay = 0) {
+  setTimeout(() => {
+    // 创建区域容器
+    const regionElement = document.createElement('div');
+    regionElement.className = 'ai-region';
+    regionElement.style.left = region.x + 'px';
+    regionElement.style.top = region.y + 'px';
+    regionElement.style.setProperty('--region-color', region.color);
+    
+    // 创建识别框
+    const boxElement = document.createElement('div');
+    boxElement.className = 'ai-box';
+    boxElement.style.width = region.width + 'px';
+    boxElement.style.height = region.height + 'px';
+    
+    // 创建标签
+    const labelElement = document.createElement('div');
+    labelElement.className = 'ai-label';
+    
+    const labelTextElement = document.createElement('span');
+    labelTextElement.className = 'ai-label-text';
+    labelElement.appendChild(labelTextElement);
+    
+    // 组装元素
+    regionElement.appendChild(boxElement);
+    regionElement.appendChild(labelElement);
+    aiDetectionContainer.appendChild(regionElement);
+    
+    // 启动文字动画（延迟1.2秒，等框动画完成）
+    setTimeout(() => {
+      animateTextReveal(labelTextElement, region.name, 800);
+    }, 1200);
+    
+  }, delay);
+}
+
+/**
+ * 显示指定区域的AI识别框
+ * @param {string} regionKey 区域键名（如"11-16"或"11-15"）
+ * @param {number} staggerDelay 每个框之间的延迟（毫秒）
+ */
+function showAIRegions(regionKey, staggerDelay = 300) {
+  // 清空现有识别框
+  aiDetectionContainer.innerHTML = '';
+  
+  // 获取指定区域的识别框数据
+  const regionData = regions[regionKey];
+  if (!regionData) {
+    console.warn(`Region ${regionKey} not found`);
+    return;
+  }
+  
+  // 依次创建识别框
+  regionData.forEach((region, index) => {
+    createAIRegion(region, index * staggerDelay);
+  });
+}
+
+/**
+ * 显示所有AI识别框（兼容旧版本）
+ * @param {number} staggerDelay 每个框之间的延迟（毫秒）
+ */
+function showAllAIRegions(staggerDelay = 300) {
+  // 默认显示11-16区域的识别框
+  showAIRegions("11-16", staggerDelay);
+}
+
+/**
+ * 隐藏所有AI识别框
+ */
+function hideAllAIRegions() {
+  aiDetectionContainer.innerHTML = '';
+}
+
+
+// 添加全局函数供外部调用
+window.showAIRegions = showAIRegions;
+window.showAllAIRegions = showAllAIRegions;
+window.hideAIRegions = hideAllAIRegions;
+window.createAIRegion = createAIRegion;
+
+/** 生成网格并绑定事件（外圈禁用） */
+for (let r = 1; r <= 12; r++) {
+  for (let c = 1; c <= 23; c++) {
+    const cell = document.createElement('div');
+    const isEdge = (r === 1 || r === 12 || c === 1 || c === 23);
+    
+    if (isEdge) {
+      cell.classList.add('disabled');
+    } else {
+      // 检查是否是蓝色区域（显示0-0图片）
+      const isBlueRegion = (
+        // 第一个蓝色块：行2-4，列12-22
+        (r >= 2 && r <= 4 && c >= 12 && c <= 22) ||
+        // 第二个蓝色块：行5-11，列19-22
+        (r >= 5 && r <= 11 && c >= 19 && c <= 22)
+      );
+      
+      if (isBlueRegion) {
+        // 蓝色区域：悬停时显示0-0图片
+        cell.addEventListener('mouseenter', () => {
+          switchTo('home-webp/0-0.webp');
+        });
+      } else {
+        // 检查是否是AI识别区域
+        const aiRegion = setupAIRegion(r, c);
+        
+        if (aiRegion.isAIRegion) {
+          // AI识别区域：悬停时显示该区域的识别框
+          cell.addEventListener('mouseenter', () => {
+            switchTo(`home-webp/${r}-${c}.webp`);
+            safeShowAIRegions(aiRegion.regionKey);
+          });
+          cell.addEventListener('mouseleave', () => {
+            safeHideAIRegions();
+          });
+        } else {
+          // 普通区域：只切换背景
+          cell.addEventListener('mouseenter', () => {
+            switchTo(`home-webp/${r}-${c}.webp`);
+          });
+        }
+      }
+    }
+    grid.appendChild(cell);
+  }
+}
+</script>
+</body>
+</html>

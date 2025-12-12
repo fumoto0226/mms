@@ -1,0 +1,435 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mm's新宿ザイリュウログ</title>
+    <link rel="icon" href="img/web-logo.svg" type="image/svg+xml" />
+    <!-- 引入字体 / フォントのインポート -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Sans+JP:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- 
+      ==================================================================================
+      🟢 CSS 样式区域 / CSSスタイルエリア
+      (请将这部分复制到你的 map.html 的 <style> 标签中)
+      ================================================================================== 
+    -->
+    <style>
+        body { margin: 0; font-family: 'Noto Sans JP', sans-serif; overflow: hidden; }
+
+        /* 1. 弹窗背景遮罩 (Overlay) */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.6); /* 黑色半透明背景 */
+            backdrop-filter: blur(4px); /* 背景模糊 */
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.4s ease, visibility 0.4s ease;
+        }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+
+        /* 2. 弹窗主体卡片 (Card Container) */
+        .modal-content {
+            width: 800px;  /* 固定宽度 */
+            height: 600px; /* 固定高度 */
+            max-width: 90%; max-height: 90%;
+            border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            
+            /* 初始状态：稍微缩小 */
+            transform: scale(0.9);
+            
+            /* 
+               ✨ 关键修改：加快变色速度 (0.6s -> 0.3s) 
+               为了配合滚动条的瞬间变化，让背景色跟得更快一点，减少违和感。
+            */
+            transition: background-color 0.3s ease, color 0.3s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .modal-overlay.active .modal-content { transform: scale(1); }
+
+        /* --- 动态主题样式 / ダイナミックテーマ --- */
+        
+        /* 🌑 暗黑模式 (2000年以前) */
+        .modal-content.theme-dark {
+            background-color: #1a1a1a; /* 深灰背景 */
+            color: #e0e0e0;            /* 浅灰文字 */
+        }
+        .modal-content.theme-dark .slide-desc { color: #bbb; }
+        
+        /* 暗黑模式按钮 */
+        .modal-content.theme-dark .close-btn { color: #fff; background: rgba(255,255,255,0.1); }
+        .modal-content.theme-dark .close-btn:hover { background: #c0392b; color: white; }
+
+        /* 🟢 暗黑模式滚动条 (Dark Scrollbar) */
+        .modal-content.theme-dark .text-area {
+            scrollbar-color: #555 transparent; /* Firefox 支持 */
+        }
+        .modal-content.theme-dark .text-area::-webkit-scrollbar-track { 
+            background-color: transparent; /* 轨道透明 */
+        }
+        .modal-content.theme-dark .text-area::-webkit-scrollbar-thumb { 
+            background-color: #555; /* 深灰色滑块 */
+            border: 2px solid #1a1a1a; /* 增加边框让滑块变细且融合背景 */
+        }
+        .modal-content.theme-dark .text-area::-webkit-scrollbar-thumb:hover { 
+            background-color: #777; /* 悬浮时稍微变亮 */
+        }
+
+
+        /* ☀️ 明亮模式 (2000年以后) */
+        .modal-content.theme-light {
+            background-color: #fdfbf7; /* 米色纸张背景 */
+            color: #4a4a4a;            /* 深灰文字 */
+        }
+        .modal-content.theme-light .slide-desc { color: #555; }
+        
+        /* 明亮模式按钮 */
+        .modal-content.theme-light .close-btn { color: #333; background: rgba(0,0,0,0.05); }
+        .modal-content.theme-light .close-btn:hover { background: #e74c3c; color: white; }
+
+        /* 明亮模式滚动条 */
+        .modal-content.theme-light .text-area { scrollbar-color: auto; }
+        .modal-content.theme-light .text-area::-webkit-scrollbar-track { background-color: rgba(0,0,0,0.05); }
+        .modal-content.theme-light .text-area::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,0.2); }
+        .modal-content.theme-light .text-area::-webkit-scrollbar-thumb:hover { background-color: rgba(0,0,0,0.4); }
+
+
+        /* 3. 关闭按钮 */
+        .close-btn {
+            position: absolute;
+            top: 15px; right: 15px; z-index: 20;
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* 弹性过渡 */
+        }
+        /* ✨ 关闭按钮悬浮动画：旋转 + 放大 */
+        .close-btn:hover {
+            transform: rotate(90deg) scale(1.15);
+        }
+
+        /* 4. 图片区域 (Top 55%) -稍微减小一点高度给文字腾空间 */
+        .carousel-area {
+            height: 55%; 
+            position: relative;
+            overflow: hidden;
+            flex-shrink: 0; /* 防止被压缩 */
+        }
+        .slide-image {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            opacity: 0; transform: scale(1.05);
+            /* 图片切换也加快一点点 */
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            position: absolute; top: 0; left: 0;
+        }
+        .slide-image.active { opacity: 1; transform: scale(1); }
+
+        /* 切换箭头 */
+        .nav-btn {
+            position: absolute; top: 50%; 
+            /* 注意：transform 包含 translateY(-50%) 用于垂直居中 */
+            transform: translateY(-50%);
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.4);
+            color: white; font-size: 20px;
+            cursor: pointer; z-index: 10;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s ease;
+        }
+        .nav-prev { left: 15px; }
+        .nav-next { right: 15px; }
+
+        /* ✨ 箭头悬浮动画：背景变亮 + 稍微放大 + 发光 */
+        .nav-btn:hover { 
+            background: rgba(255,255,255,0.5); 
+            transform: translateY(-50%) scale(1.15);
+            box-shadow: 0 0 15px rgba(255,255,255,0.3);
+        }
+        .nav-btn:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+
+        /* 5. 文字区域 (Bottom 45%) - 增加高度，开启滚动 */
+        .text-area {
+            flex: 1; /* 占据剩余空间 */
+            padding: 30px 40px;
+            display: block; /* 改为 block 方便滚动 */
+            position: relative;
+            overflow-y: auto; /* 🟢 开启垂直滚动 */
+            
+            /* Firefox 滚动条 (默认样式，会被 theme-dark 覆盖) */
+            scrollbar-width: thin; 
+        }
+        
+        /* 尝试给滚动条加过渡 (部分浏览器支持) */
+        .text-area::-webkit-scrollbar-thumb {
+            transition: background-color 0.3s ease;
+        }
+        
+        /* Webkit 滚动条基础设置 */
+        .text-area::-webkit-scrollbar {
+            width: 8px; /* 稍微宽一点方便点按 */
+        }
+        .text-area::-webkit-scrollbar-track {
+            border-radius: 4px;
+        }
+        .text-area::-webkit-scrollbar-thumb {
+            border-radius: 4px;
+        }
+
+        /* 年份标签 */
+        .year-badge {
+            font-family: 'Noto Serif JP', serif;
+            font-size: 48px;
+            font-weight: 700;
+            opacity: 0.15;
+            position: absolute;
+            top: 20px; right: 30px;
+            pointer-events: none;
+            transition: color 0.3s;
+        }
+
+        /* 标题 */
+        .slide-title {
+            font-family: 'Noto Serif JP', serif;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            padding-right: 60px; /* 防止标题遮挡年份 */
+            position: relative;
+            z-index: 2;
+        }
+
+        /* 正文 - 优化长文排版 */
+        .slide-desc {
+            font-size: 15px;
+            line-height: 1.8; /* 增加行高，更易阅读 */
+            text-align: justify; /* 两端对齐，看起来更整齐 */
+            position: relative;
+            z-index: 2;
+            transition: color 0.3s;
+            margin-bottom: 30px; /* 底部留白 */
+            white-space: pre-wrap; /* 保留换行符 */
+        }
+
+        /* 页码 */
+        .pagination {
+            display: block;
+            text-align: center;
+            margin-top: 10px;
+            font-size: 12px; opacity: 0.6;
+            font-family: 'Noto Serif JP', serif;
+        }
+
+
+        /* --- 模拟地图样式 (无需复制) --- */
+        .simulated-map {
+            width: 100vw; height: 100vh;
+            background-color: #dcdcdc;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), 
+                linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px);
+            background-size: 40px 40px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .map-trigger {
+            padding: 15px 30px;
+            background: #2c3e50; color: white;
+            border-radius: 50px; cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            font-weight: bold; transition: transform 0.2s;
+        }
+        .map-trigger:hover { transform: scale(1.05); }
+    </style>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+
+    <!-- 🔴 模拟地图页面 / 模擬マップページ -->
+    <div class="simulated-map">
+        <div class="map-trigger" onclick="openModal()">
+            Click to Open Shinjuku History
+        </div>
+    </div>
+
+
+    <!-- 
+      ==================================================================================
+      🟢 弹窗 HTML 结构 (Time Travel Style)
+      (请将这部分复制到你的 map.html 的 <body> 结束前)
+      ================================================================================== 
+    -->
+    <div id="historyModal" class="modal-overlay" onclick="closeModal()">
+        <!-- 
+            注意：这里的 class "theme-dark" 会由 JS 自动控制，默认先写一个 
+        -->
+        <div id="modalContent" class="modal-content theme-dark" onclick="event.stopPropagation()">
+            
+            <!-- 关闭按钮 -->
+            <button class="close-btn" onclick="closeModal()">×</button>
+
+            <!-- 1. 图片部分 -->
+            <div class="carousel-area">
+                <button class="nav-btn nav-prev" onclick="prevSlide()">&#10094;</button>
+                <button class="nav-btn nav-next" onclick="nextSlide()">&#10095;</button>
+                <img id="modalImg" class="slide-image active" src="" alt="History">
+            </div>
+
+            <!-- 2. 文字部分 (可滚动) -->
+            <div id="modalTextArea" class="text-area">
+                <!-- 年份水印 -->
+                <div id="modalYear" class="year-badge">1885</div>
+                
+                <h2 id="modalTitle" class="slide-title">Loading...</h2>
+                <p id="modalDesc" class="slide-desc">Loading...</p>
+                
+                <!-- 页码 -->
+                <div class="pagination">
+                    <span id="currentIndex">1</span> / <span id="totalIndex">3</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- 
+      ==================================================================================
+      🟢 JS 逻辑区域
+      (请将这部分复制到你的 map.html 的 <script> 标签中)
+      ================================================================================== 
+    -->
+    <script>
+        // 👇👇👇 1. 历史数据配置 (务必填写 year) / データ設定 (yearは必須) 👇👇👇
+        const historyData = [
+            {
+                year: 1885, // 🔴 小于2000 -> 暗黑模式
+                image: "https://images.unsplash.com/photo-1505567745926-ba2500077128?q=80&w=2070&auto=format&fit=crop", 
+                title: "新宿駅の開業と初期",
+                description: "明治18年（1885年）、日本鉄道品川線（現在の山手線）の駅として新宿駅は開業しました。当時の新宿は、甲州街道の宿場町「内藤新宿」から少し離れた静かな農村地帯にあり、駅周辺には茶畑や雑木林が広がっていました。\n\n開業当初の利用者は非常に少なく、1日の乗降客数が50人程度の日もあったと記録されています。雨の日には誰も駅を利用しないことさえありました。当時の駅舎は木造の簡素なもので、現在の巨大ターミナルからは想像もつかないほど牧歌的な風景でした。\n\nしかし、その後、甲武鉄道（現在の中央線）や東京市街鉄道などの乗り入れが進むにつれて、新宿は交通の要衝としての地位を徐々に確立していきました。これは、現在に至る新宿の発展の、まさに最初の第一歩だったのです。"
+            },
+            {
+                year: 1964, // 🔴 小于2000 -> 暗黑模式
+                image: "https://images.unsplash.com/photo-1589463349206-898492d5c171?q=80&w=2070&auto=format&fit=crop",
+                title: "戦後復興と副都心計画",
+                description: "第二次世界大戦後、新宿は焼け野原からの復興を遂げました。特に大きな転機となったのが、1964年の東京オリンピックです。この時期、高度経済成長とともに東京の人口は急増し、都心部の過密解消が課題となっていました。\n\nそこで計画されたのが「新宿副都心計画」です。淀橋浄水場の跡地を利用して、超高層ビル街を建設するという壮大なプロジェクトが始動しました。1971年の京王プラザホテルを皮切りに、住友ビル、三井ビルなどが次々と建設され、新宿のスカイラインは劇的に変化しました。\n\n同時に、駅周辺には百貨店や映画館などの商業施設が集積し、若者文化の発信地としても注目を集めるようになりました。この頃から、新宿は「昼のビジネス街」と「夜の繁華街」という二つの顔を持つ、独特な都市へと進化していきました。"
+            },
+            {
+                year: 2024, // 🔵 大于等于2000 -> 明亮模式
+                image: "https://images.unsplash.com/photo-1536098561742-ca998e48cbcc?q=80&w=2036&auto=format&fit=crop",
+                title: "世界一の巨大ターミナルへ",
+                description: "現在、新宿駅は1日の乗降客数が約350万人を超え、ギネス世界記録にも認定されている世界一の巨大ターミナル駅です。JR、私鉄、地下鉄の各線が複雑に乗り入れ、東京の交通大動脈の中心として機能しています。\n\n2020年代に入り、新宿駅周辺では「新宿グランドターミナル構想」に基づく大規模な再開発が進行中です。駅の東西をスムーズに行き来できる自由通路の開通や、老朽化したビルの建て替え、歩行者空間の拡充など、街は常に新陳代謝を続けています。\n\nかつての静かな農村の駅は、今や最先端のテクノロジーと多様な文化が交錯する、眠らない街のシンボルとなりました。過去から現在、そして未来へと、新宿の歴史は止まることなく刻まれ続けています。"
+            }
+        ];
+        // 👆👆👆 編集終了 👆👆👆
+
+
+        // --- 系统逻辑 / システムロジック ---
+        
+        let currentSlideIndex = 0;
+        const modal = document.getElementById('historyModal');
+        const modalContent = document.getElementById('modalContent');
+        const textArea = document.getElementById('modalTextArea'); // 文字容器
+        
+        const imgEl = document.getElementById('modalImg');
+        const yearEl = document.getElementById('modalYear');
+        const titleEl = document.getElementById('modalTitle');
+        const descEl = document.getElementById('modalDesc');
+        const currentIdxEl = document.getElementById('currentIndex');
+        const totalIdxEl = document.getElementById('totalIndex');
+
+        // 初始化
+        function initModal() {
+            totalIdxEl.innerText = historyData.length;
+            updateSlideContent();
+        }
+
+        // 更新内容核心函数
+        function updateSlideContent() {
+            const data = historyData[currentSlideIndex];
+            
+            // 1. 切换图片 (Fade Effect)
+            imgEl.style.opacity = 0; 
+            
+            // 2. 文字区域淡出 (可选，为了平滑)
+            titleEl.style.opacity = 0;
+            descEl.style.opacity = 0;
+
+            setTimeout(() => {
+                // 更新 DOM 内容
+                imgEl.src = data.image;
+                titleEl.innerText = data.title;
+                descEl.innerText = data.description;
+                yearEl.innerText = data.year;
+                currentIdxEl.innerText = currentSlideIndex + 1;
+                
+                // 重置文字区域的滚动条到顶部
+                if (textArea) textArea.scrollTop = 0;
+
+                // 淡入
+                imgEl.style.opacity = 1; 
+                titleEl.style.opacity = 1;
+                descEl.style.opacity = 1;
+            }, 300); // Wait for half the transition time
+
+            // 3. ✨ 自动判断主题色 (Auto Theme Switcher) ✨
+            // 规则：2000年及以后用亮色(Light)，2000年以前用暗色(Dark)
+            if (data.year >= 2000) {
+                modalContent.classList.remove('theme-dark');
+                modalContent.classList.add('theme-light');
+            } else {
+                modalContent.classList.remove('theme-light');
+                modalContent.classList.add('theme-dark');
+            }
+        }
+
+        function nextSlide() {
+            currentSlideIndex = (currentSlideIndex + 1) % historyData.length;
+            updateSlideContent();
+        }
+
+        function prevSlide() {
+            currentSlideIndex = (currentSlideIndex - 1 + historyData.length) % historyData.length;
+            updateSlideContent();
+        }
+
+        function openModal() {
+            if (modal) {
+                modal.classList.add('active');
+                initModal();
+            }
+        }
+
+        function closeModal() {
+            if (modal) modal.classList.remove('active');
+        }
+
+        // 键盘监听
+        document.addEventListener('keydown', (e) => {
+            if (!modal.classList.contains('active')) return;
+            if (e.key === "Escape") closeModal();
+            if (e.key === "ArrowRight") nextSlide();
+            if (e.key === "ArrowLeft") prevSlide();
+        });
+
+        initModal();
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

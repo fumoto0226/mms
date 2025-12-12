@@ -1,0 +1,466 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map Modal (Vanilla JS Version)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- 
+      ==================================================================================
+      🟢 CSS 样式区域 / CSSスタイルエリア
+      (请将这部分复制到你的 map.html 的 <style> 标签中)
+      (この部分を map.html の <style> タグにコピーしてください)
+      ================================================================================== 
+    -->
+    <style>
+        :root {
+            --primary: #d40000;
+            --primary-dark: #9c0000;
+            --accent: #ffb400;
+            --text: #2b2b2b;
+            --panel: #fff7e6;
+        }
+        .book-wrap {
+            width: 100%;
+            max-width: 840px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            position: relative;
+        }
+        .book-spine {
+            position: absolute;
+            left: 50%;
+            top: -12px;
+            bottom: -12px;
+            width: 12px;
+            background: linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.15));
+            box-shadow: inset 0 0 6px rgba(0,0,0,0.1);
+            border-radius: 6px;
+            transform: translateX(-50%);
+            z-index: 0;
+        }
+        .page {
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: 16px;
+            box-shadow: 0 10px 22px rgba(0,0,0,0.12), inset 0 0 0 2px rgba(255, 180, 0, 0.25);
+            padding: 20px 20px 18px;
+            position: relative;
+            z-index: 1;
+        }
+        .page-left {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+        }
+        .page-right {
+            color: var(--text);
+            line-height: 1.85;
+            font-size: 13px;
+        }
+        .binder-hole {
+            position: absolute;
+            left: 50%;
+            width: 18px;
+            height: 18px;
+            border: 3px solid #c5c5c5;
+            border-radius: 50%;
+            background: #f1f1f1;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2), inset 0 0 0 2px #fff;
+            transform: translateX(-50%);
+        }
+        .binder-hole:nth-child(1) { top: 70px; }
+        .binder-hole:nth-child(2) { top: 180px; }
+        .binder-hole:nth-child(3) { top: 290px; }
+        .binder-hole:nth-child(4) { top: 400px; }
+        body { margin: 0; font-family: 'Noto Sans JP', sans-serif; overflow: hidden; background-color: #fff4e0; }
+
+        /* -----------------------------------------------------------
+           1. 弹窗容器 (Modal Container)
+           控制背景遮罩的样式
+        ----------------------------------------------------------- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4); /* 半透明背景 */
+            backdrop-filter: blur(2px); /* 背景模糊 */
+            z-index: 1000; /* 保证在最上层 */
+            
+            /* 居中布局 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+
+            /* 初始状态：隐藏 */
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        /* 激活状态：显示 */
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* -----------------------------------------------------------
+           2. 弹窗主体 (Modal Body)
+           控制白色卡片的样式和动画
+        ----------------------------------------------------------- */
+        .modal-content {
+            background-image: url('bg.gif');
+            background-size: 100% 100%; /* 拉满卡片，去掉上下黄边 */
+            background-position: center center;
+            background-repeat: no-repeat;
+            background-color: #fff4e0;
+            width: 100%;
+            max-width: 900px; /* 👇 宽度 / 幅 (这里修改宽度) */
+            height: 600px;    /* 👇 高度 / 高さ (这里修改高度) */
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(212, 0, 0, 0.28), 0 0 0 2px rgba(255, 180, 0, 0.25);
+            position: relative;
+            overflow: hidden;
+            
+            /* 内部布局 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 48px 28px 20px;
+            overflow-y: auto;
+
+            /* 初始动画状态：稍微缩小并向下位移 */
+            transform: scale(0.95) translateY(20px);
+            opacity: 0;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+        }
+
+
+        /* 激活状态：正常大小和位置 */
+        .modal-overlay.active .modal-content {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+        }
+
+        /* -----------------------------------------------------------
+           3. 关闭按钮 (Close Button)
+        ----------------------------------------------------------- */
+        .close-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(212, 0, 0, 0.15);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 10;
+        }
+        .close-btn:hover {
+            background-color: rgba(212, 0, 0, 0.25);
+            transform: scale(1.1) rotate(90deg);
+        }
+        .close-btn:active {
+            transform: scale(0.95) rotate(90deg);
+        }
+        /* 用 CSS 画一个叉叉 (避免依赖 SVG 库) */
+        .close-btn::before, .close-btn::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 2px;
+            background-color: var(--primary);
+            border-radius: 1px;
+            transition: all 0.3s ease;
+        }
+        .close-btn::before { transform: rotate(45deg); }
+        .close-btn::after { transform: rotate(-45deg); }
+        .close-btn:hover::before, .close-btn:hover::after { 
+            background-color: var(--primary-dark);
+            width: 22px;
+        }
+
+        /* 画像スライダーボタンのスタイル */
+        .slider-btn {
+            background: rgba(212, 0, 0, 0.12);
+            border: 2px solid rgba(212, 0, 0, 0.5);
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            font-size: 28px;
+            cursor: pointer;
+            color: var(--primary);
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            box-shadow: 0 4px 8px rgba(212, 0, 0, 0.18);
+            flex-shrink: 0;
+        }
+        .slider-btn:hover {
+            background: rgba(212, 0, 0, 0.22);
+            color: var(--primary-dark);
+            transform: scale(1.15);
+            box-shadow: 0 6px 12px rgba(212, 0, 0, 0.3);
+        }
+        .slider-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* 画像コンテナのアニメーション */
+        .image-container {
+            transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+        .image-container:hover {
+            transform: scale(1.02);
+        }
+
+        /* -----------------------------------------------------------
+           4. 模拟地图环境样式 (仅用于演示，不需要复制)
+           シミュレーション用スタイル (コピー不要)
+        ----------------------------------------------------------- */
+        .simulated-map {
+            width: 100vw;
+            height: 100vh;
+            background-color: #e5e5f7;
+            background-image: linear-gradient(#cdd1d6 1px, transparent 1px), linear-gradient(to right, #cdd1d6 1px, #e5e5f7 1px);
+            background-size: 40px 40px;
+            position: relative;
+        }
+        .map-ui-search {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            color: #888;
+            font-size: 14px;
+            width: 250px;
+        }
+        .map-pin {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        .map-pin:hover { transform: translate(-50%, -50%) scale(1.1); }
+        .pin-icon {
+            width: 40px;
+            height: 40px;
+            background-color: #ef4444;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            margin: 0 auto;
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .pin-shadow {
+            width: 20px;
+            height: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 50%;
+            margin: -5px auto 0;
+            filter: blur(2px);
+        }
+    </style>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+
+    <!-- 
+      ==================================================================================
+      🔴 模拟地图页面 (map.html) / 模擬地図ページ
+      ================================================================================== 
+    -->
+    <div class="simulated-map">
+        <!-- 模拟 UI -->
+        <div class="map-ui-search">🔍 Search location...</div>
+        
+        <!-- 模拟地图上的点击触发点 (Pin) -->
+        <div class="map-pin" onclick="openModal()">
+            <div class="pin-icon"></div>
+            <div class="pin-shadow"></div>
+            <div style="margin-top:10px; font-weight:bold; color:#444;">Click Me</div>
+        </div>
+    </div>
+
+
+    <!-- 
+      ==================================================================================
+      🟢 弹窗 HTML 结构 / ポップアップ HTML 構造
+      (请将这部分复制到你的 map.html 的 <body> 结束前)
+      (この部分を map.html の <body> 終了直前にコピーしてください)
+      ================================================================================== 
+    -->
+    
+    <!-- 弹窗遮罩层 -->
+    <div id="myModal" class="modal-overlay" onclick="closeModal()">
+        <!-- 弹窗内容卡片 (阻止冒泡，防止点击卡片关闭) -->
+        <div class="modal-content" onclick="event.stopPropagation()">
+            
+            <!-- 关闭按钮 -->
+            <button class="close-btn" onclick="closeModal()" aria-label="Close"></button>
+
+            <!-- 👇👇👇 内容区域 / コンテンツエリア 👇👇👇 -->
+            <div class="book-wrap">
+                <div class="book-spine"></div>
+                <div class="binder-hole" style="top: 70px;"></div>
+                <div class="binder-hole" style="top: 180px;"></div>
+                <div class="binder-hole" style="top: 290px;"></div>
+                <div class="binder-hole" style="top: 400px;"></div>
+
+                <div class="page page-left">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 120px; margin-bottom: 8px;">
+                        <button id="prevBtn" class="slider-btn">&lt;</button>
+                        <div class="image-container" style="width: 100%; max-width: 360px; height: 240px; border-radius: 12px; overflow: hidden; position: relative; flex-shrink: 0; box-shadow: 0 8px 16px rgba(212, 0, 0, 0.28);">
+                            <img id="sliderImage" src="gaikan.jpg" alt="画像" style="width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; transition: opacity 0.3s ease, transform 0.3s ease;">
+                        </div>
+                        <button id="nextBtn" class="slider-btn">&gt;</button>
+                    </div>
+                    <p style="margin: 0; color: var(--primary-dark); font-weight: 700; text-align: center;">
+                        
+                    </p>
+                </div>
+
+                <div class="page page-right">
+                    <h2 style="font-size: 20px; color: var(--primary); margin: 0 0 8px; font-weight: 800; letter-spacing: 0.4px; text-shadow: 0 2px 6px rgba(212, 0, 0, 0.25);">
+                        宇宙人の地球グルメ探索：麻辣烫レポート
+                    </h2>
+                    <p style="margin: 0 0 10px; color: var(--primary-dark); font-weight: 700;">
+                        香りで昇天、辛さで触手が震える——火星まで届く旨辛信号！
+                    </p>
+                    <p style="margin-bottom: 14px;">
+                        地球の食べ物は優しい味だと思っていたのに、麻辣烫を一口で触手が辛さ警報を発動。<br>
+                        花椒のシビレは宇宙通信レベル、辣油の香りは銀河を満たす勢い。辛いのに、香りがあまりに魅力的で箸が止まらない……！
+                    </p>
+
+                    <div style="background: rgba(255, 180, 0, 0.12); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; border: 1px solid rgba(212, 0, 0, 0.22); box-shadow: 0 6px 14px rgba(212, 0, 0, 0.12);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 4px 0;">
+                            <span style="font-weight: 700; min-width: 120px; color: var(--primary);">シビれ</span>
+                            <span style="font-size: 16px; letter-spacing: 1px;">🌶️🌶️🌶️🌶️🌶️</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 4px 0;">
+                            <span style="font-weight: 700; min-width: 120px; color: var(--primary);">辛さ</span>
+                            <span style="font-size: 16px; letter-spacing: 1px;">🔥🔥🔥🔥🔥</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0;">
+                            <span style="font-weight: 700; min-width: 120px; color: var(--primary);">出汁の旨味</span>
+                            <span style="font-size: 16px; letter-spacing: 1px;">💧💧💧💧💧<span style="font-size: 11px; color: var(--primary-dark); margin-left: 6px;"></span></span>
+                        </div>
+                    </div>
+
+                    <p style="font-weight: 700; font-size: 14px; margin: 0 0 6px; color: var(--primary-dark);">
+                        地球人：超おすすめ！香りで無限ループ。<br>
+                        宇宙人：必ず「微辣」から。でないと、そのまま宇宙まで飛んでいくかもしれません。
+                    </p>
+                </div>
+            </div>
+            <!-- 👆👆👆 内容结束 / コンテンツ終了 👆👆👆 -->
+
+        </div>
+    </div>
+
+
+    <!-- 
+      ==================================================================================
+      🟢 JS 逻辑区域 / JS ロジックエリア
+      (请将这部分复制到你的 map.html 的 <script> 标签中)
+      (この部分を map.html の <script> タグにコピーしてください)
+      ================================================================================== 
+    -->
+    <script>
+        // 获取弹窗元素
+        const modal = document.getElementById('myModal');
+
+        // 打开弹窗函数 / ポップアップを開く関数
+        // 你可以在点击地图 Marker 时调用这个函数
+        function openModal() {
+            if (modal) {
+                // 添加 'active' 类来触发 CSS 动画
+                modal.classList.add('active');
+            }
+        }
+
+        // 关闭弹窗函数 / ポップアップを閉じる関数
+        function closeModal() {
+            if (modal) {
+                // 移除 'active' 类
+                modal.classList.remove('active');
+            }
+        }
+
+        // (可选) 按 ESC 键关闭 / (オプション) ESCキーで閉じる
+        document.addEventListener('keydown', function(event) {
+            if (event.key === "Escape") {
+                closeModal();
+            }
+        });
+
+        // 画像スライダーのロジック
+        const images = ['1.jpg','2.jpg'];
+        let currentIndex = 0;
+        const sliderImage = document.getElementById('sliderImage');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const imageContainer = document.querySelector('.image-container');
+
+        function updateImage(direction) {
+            // フェードアウト
+            sliderImage.style.opacity = '0';
+            sliderImage.style.transform = direction === 'next' ? 'translateX(-10px)' : 'translateX(10px)';
+            
+            setTimeout(() => {
+                // 画像を変更
+                sliderImage.src = images[currentIndex];
+                // フェードイン
+                sliderImage.style.opacity = '1';
+                sliderImage.style.transform = 'translateX(0)';
+            }, 150);
+        }
+
+        prevBtn.addEventListener('click', function() {
+            currentIndex = (currentIndex - 1 + images.length) % images.length;
+            updateImage('prev');
+            // ボタンのバウンスアニメーション
+            this.style.transform = 'scale(0.9)';
+            setTimeout(() => {
+                this.style.transform = '';
+            }, 200);
+        });
+
+        nextBtn.addEventListener('click', function() {
+            currentIndex = (currentIndex + 1) % images.length;
+            updateImage('next');
+            // ボタンのバウンスアニメーション
+            this.style.transform = 'scale(0.9)';
+            setTimeout(() => {
+                this.style.transform = '';
+            }, 200);
+        });
+
+        // 初期画像を設定（gaikan.jpg）
+        sliderImage.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        updateImage();
+    </script>
+
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
