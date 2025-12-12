@@ -86,7 +86,7 @@
     content: '';
     position: absolute;
     inset: -55% -40% -5%;
-    background-image: url('img/7q.png');
+    background-image: url('img/7q.webp');
     background-repeat: repeat-x;
     background-size: 2620px auto;
     background-position: 0px 55%;
@@ -1028,8 +1028,8 @@
 
   .gallery-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
   }
 
   .gallery-item {
@@ -1049,7 +1049,7 @@
 
   .gallery-item img {
     width: 100%;
-    height: 220px;
+    height: 160px;
     object-fit: cover;
     display: block;
     border-radius: 0;
@@ -1289,9 +1289,149 @@ const GALLERY_IMAGES = [
   'IMG_9941.webp', 'IMG_9970.webp', 'IMG_9991.webp', 'IMG_9992.webp', 'IMG_9994.webp',
   'IMG_9998.webp'
 ];
-const GALLERY_THUMB_CACHE = new Map();
-const GALLERY_THUMB_MAX_SIZE = 640;
-const GALLERY_THUMB_PLACEHOLDER = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><rect width='100%25' height='100%25' fill='%23f2f2f2'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='14' fill='%23999'>loading...</text></svg>";
+
+// 画像集缩略图配置
+const GALLERY_THUMB_MAX_SIZE = 800; // 缩略图最大尺寸（宽或高）
+const GALLERY_THUMB_QUALITY = 0.9; // JPEG 质量（0.9 高质量，接近无损）
+let thumbDb = null;
+
+// 初始化 IndexedDB 用于缓存缩略图
+async function initThumbDb() {
+  if (thumbDb) return thumbDb;
+  
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('galleryThumbs', 1);
+    
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      thumbDb = request.result;
+      resolve(thumbDb);
+    };
+    
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains('thumbs')) {
+        db.createObjectStore('thumbs', { keyPath: 'name' });
+      }
+    };
+  });
+}
+
+// 从 IndexedDB 获取缩略图
+async function getThumbFromCache(name) {
+  try {
+    await initThumbDb();
+    return new Promise((resolve, reject) => {
+      const transaction = thumbDb.transaction(['thumbs'], 'readonly');
+      const store = transaction.objectStore('thumbs');
+      const request = store.get(name);
+      
+      request.onsuccess = () => {
+        const result = request.result;
+        if (result && result.blob) {
+          resolve(URL.createObjectURL(result.blob));
+        } else {
+          resolve(null);
+        }
+      };
+      
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('缩略图缓存读取失败:', err);
+    return null;
+  }
+}
+
+// 保存缩略图到 IndexedDB
+async function saveThumbToCache(name, blob) {
+  try {
+    await initThumbDb();
+    return new Promise((resolve, reject) => {
+      const transaction = thumbDb.transaction(['thumbs'], 'readwrite');
+      const store = transaction.objectStore('thumbs');
+      const request = store.put({ name, blob });
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('缩略图缓存保存失败:', err);
+  }
+}
+
+// 生成 JPEG 缩略图（更高效的方法）
+async function generateThumbnail(imageUrl, name) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    img.onload = () => {
+      try {
+        // 计算缩略图尺寸
+        let width = img.width;
+        let height = img.height;
+        const maxSize = GALLERY_THUMB_MAX_SIZE;
+        
+        if (width > height) {
+          if (width > maxSize) {
+            height = (height * maxSize) / width;
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width = (width * maxSize) / height;
+            height = maxSize;
+          }
+        }
+        
+        // 创建 Canvas 并绘制缩略图
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        // 设置高质量图像平滑算法以提高清晰度
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // 使用 toBlob 直接生成 JPEG Blob（比 toDataURL + fetch 更高效）
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            reject(new Error('缩略图生成失败'));
+            return;
+          }
+          
+          try {
+            // 保存到缓存
+            await saveThumbToCache(name, blob);
+            resolve(URL.createObjectURL(blob));
+          } catch (err) {
+            reject(err);
+          }
+        }, 'image/jpeg', GALLERY_THUMB_QUALITY);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    
+    img.onerror = () => reject(new Error('图片加载失败'));
+    img.src = imageUrl;
+  });
+}
+
+// 获取缩略图（优先从缓存读取，否则生成）
+async function getGalleryThumbnail(name) {
+  // 先尝试从缓存读取
+  const cached = await getThumbFromCache(name);
+  if (cached) {
+    return cached;
+  }
+  
+  // 缓存未命中，生成缩略图
+  const imageUrl = `gazou/${name}`;
+  return await generateThumbnail(imageUrl, name);
+}
 
 let defaultLoadingText = '';
 
@@ -2207,35 +2347,8 @@ function setGalleryLoading(isLoading) {
   gridEl.style.opacity = isLoading ? '0.6' : '1';
 }
 
-function getGalleryThumbnail(src) {
-  if (GALLERY_THUMB_CACHE.has(src)) {
-    return Promise.resolve(GALLERY_THUMB_CACHE.get(src));
-  }
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(GALLERY_THUMB_MAX_SIZE / img.width, GALLERY_THUMB_MAX_SIZE / img.height, 1);
-      const w = Math.max(1, Math.round(img.width * scale));
-      const h = Math.max(1, Math.round(img.height * scale));
-      const canvasEl = document.createElement('canvas');
-      canvasEl.width = w;
-      canvasEl.height = h;
-      const context = canvasEl.getContext('2d');
-      if (!context) {
-        reject(new Error('canvas context unavailable'));
-        return;
-      }
-      context.drawImage(img, 0, 0, w, h);
-      const dataUrl = canvasEl.toDataURL('image/jpeg', 1);
-      GALLERY_THUMB_CACHE.set(src, dataUrl);
-      resolve(dataUrl);
-    };
-    img.onerror = reject;
-    img.src = src;
-  });
-}
 
-function renderGalleryImages() {
+async function renderGalleryImages() {
   const gridEl = document.getElementById('gallery-grid');
   const emptyEl = document.getElementById('gallery-empty');
   if (!gridEl || !emptyEl) {
@@ -2247,28 +2360,44 @@ function renderGalleryImages() {
     return;
   }
   emptyEl.style.display = 'none';
-  GALLERY_IMAGES.forEach((name) => {
+  
+  // 初始化 IndexedDB
+  await initThumbDb();
+  
+  // 为每个图片创建缩略图（渐进式加载，不等待全部完成）
+  GALLERY_IMAGES.forEach(async (name) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'gallery-item';
 
     const img = document.createElement('img');
-    img.src = GALLERY_THUMB_PLACEHOLDER;
     img.alt = name;
     img.loading = 'lazy';
-
+    img.style.opacity = '0.5'; // 初始半透明，加载完成后变为不透明
+    
+    // 先添加到 DOM
     btn.appendChild(img);
     btn.onclick = () => handleGallerySelect(name);
-
     gridEl.appendChild(btn);
-    const src = `gazou/${name}`;
-    getGalleryThumbnail(src)
-      .then((dataUrl) => {
-        img.src = dataUrl;
-      })
-      .catch(() => {
-        img.src = src;
-      });
+    
+    // 异步加载缩略图
+    (async () => {
+      try {
+        // 获取缩略图（优先从缓存，否则生成）
+        const thumbUrl = await getGalleryThumbnail(name);
+        img.src = thumbUrl;
+        img.onload = () => {
+          img.style.opacity = '1';
+        };
+      } catch (err) {
+        console.warn(`缩略图加载失败 ${name}:`, err);
+        // 失败时回退到原图
+        img.src = `gazou/${name}`;
+        img.onload = () => {
+          img.style.opacity = '1';
+        };
+      }
+    })();
   });
 }
 
